@@ -4,25 +4,25 @@
 # Update with actual GitHub usernames before going live.
 
 # Global default — all files
-*                          @org/todo-core
+*                          @org/weup-core
 
 # Backend
-backend/                   @org/todo-backend
-backend/app/auth/          @org/todo-security @org/todo-backend
-backend/app/core/security* @org/todo-security
+backend/                   @org/weup-backend
+backend/app/auth/          @org/weup-security @org/weup-backend
+backend/app/core/security* @org/weup-security
 
 # Frontend
-frontend/                  @org/todo-frontend
+frontend/                  @org/weup-frontend
 
 # Infrastructure & CI
-.github/                   @org/todo-devops @org/todo-core
-docker-compose*.yml        @org/todo-devops
-nginx/                     @org/todo-devops
+.github/                   @org/weup-devops @org/weup-core
+docker-compose*.yml        @org/weup-devops
+nginx/                     @org/weup-devops
 
 # Security & compliance
-docs/security/             @org/todo-security
-docs/formal-verification/  @org/todo-core
-tla/                       @org/todo-core
+docs/security/             @org/weup-security
+docs/formal-verification/  @org/weup-core
+tla/                       @org/weup-core
 
 # ADRs require lead review
-docs/adr/                  @org/todo-core
+docs/adr/                  @org/weup-core

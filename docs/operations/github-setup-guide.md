@@ -13,15 +13,15 @@
 gh auth login
 
 # Create public or private repo
-gh repo create todo-app \
+gh repo create weup-career \
   --private \
-  --description "Production-grade Todo application — FastAPI + React + TypeScript" \
+  --description "WeUp Career — nền tảng hướng nghiệp cho học sinh và người đi làm tại Việt Nam (FastAPI + React + TypeScript)" \
   --homepage "https://your-domain.com"
 ```
 
 ### Option B — GitHub Web UI
 1. Go to https://github.com/new
-2. Repository name: `todo-app`
+2. Repository name: `weup-career`
 3. Visibility: Private (recommended)
 4. Do NOT initialize with README (we have our own)
 5. Click "Create repository"
@@ -32,7 +32,7 @@ gh repo create todo-app \
 
 ```bash
 # Set remote origin
-git remote add origin https://github.com/YOUR_USERNAME/todo-app.git
+git remote add origin https://github.com/YOUR_USERNAME/weup-career.git
 
 # Push main branch
 git push -u origin main
@@ -112,7 +112,7 @@ First push sets image visibility. Set to **Private** initially:
 # After first CI run, set image visibility:
 gh api \
   -X PATCH \
-  /user/packages/container/todo-app%2Fbackend/versions/LATEST_ID \
+  /user/packages/container/weup-career%2Fbackend/versions/LATEST_ID \
   -f visibility=private
 ```
 

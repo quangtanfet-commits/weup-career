@@ -24,4 +24,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/org/todo-app/compare/HEAD
+[Unreleased]: https://github.com/org/weup-career/compare/HEAD

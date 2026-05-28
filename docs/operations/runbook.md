@@ -44,7 +44,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps 
 # 4. If smoke tests fail — rollback
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d \
   --no-deps backend \
-  --image ghcr.io/org/todo-backend:PREVIOUS_SHA
+  --image ghcr.io/org/weup-career-backend:PREVIOUS_SHA
 
 # 5. Verify rollback
 ./scripts/smoke-test.sh

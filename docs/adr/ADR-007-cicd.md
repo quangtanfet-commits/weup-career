@@ -80,7 +80,7 @@ jobs:
 
 - Python: cache `~/.cache/uv` by `pyproject.toml` hash
 - Node: cache `~/.npm` by `package-lock.json` hash
-- Docker layers: `--cache-from type=registry,ref=ghcr.io/org/todo:buildcache`
+- Docker layers: `--cache-from type=registry,ref=ghcr.io/org/weup-career:buildcache`
 
 Reduces PR gate time from ~8min → ~2min after warm cache.
 

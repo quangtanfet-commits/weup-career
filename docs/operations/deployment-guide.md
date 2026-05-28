@@ -20,8 +20,8 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/org/todo-app.git
-cd todo-app
+git clone https://github.com/org/weup-career.git
+cd weup-career
 
 # 2. Copy environment template
 cp .env.example .env
@@ -77,8 +77,8 @@ chown -R deploy:deploy /var/lib/todo
 ```bash
 # As deploy user
 cd /home/deploy
-git clone https://github.com/org/todo-app.git
-cd todo-app
+git clone https://github.com/org/weup-career.git
+cd weup-career
 
 # Generate and store secret key
 openssl rand -hex 32 > /var/lib/todo/secrets/secret_key.txt
@@ -107,7 +107,7 @@ echo "0 12 * * * certbot renew --quiet && docker compose restart nginx" | cronta
 ### Step 4: Start Services
 
 ```bash
-cd /home/deploy/todo-app
+cd /home/deploy/weup-career
 
 # Start
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
@@ -159,7 +159,7 @@ Production deployment:
 
 ```bash
 # List available versions
-docker images ghcr.io/org/todo-backend --format "table {{.Tag}}\t{{.CreatedAt}}"
+docker images ghcr.io/org/weup-career-backend --format "table {{.Tag}}\t{{.CreatedAt}}"
 
 # Rollback to previous SHA
 export PREVIOUS_SHA=sha-a1b2c3d

@@ -42,7 +42,7 @@ jobs:
           envs: REGISTRY,IMAGE_PREFIX
           script: |
             set -e
-            cd /home/deploy/todo-app
+            cd /home/deploy/weup-career
 
             export VERSION="${{ steps.version.outputs.version }}"
             export BACKEND_IMAGE="${REGISTRY}/${IMAGE_PREFIX}/backend:${VERSION}"

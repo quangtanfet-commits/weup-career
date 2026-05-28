@@ -1,8 +1,9 @@
-# ✓ Todos
+# WeUp Career
 
-> A production-grade Todo application. Simple interface. Solid engineering underneath.
+> Nền tảng hướng nghiệp cho học sinh và người đi làm tại Việt Nam.
+> _Vươn lên cùng sự nghiệp của bạn — Rise up in your career._
 
-[![CI](https://github.com/org/todo-app/actions/workflows/ci.yml/badge.svg)](https://github.com/org/todo-app/actions)
+[![CI](https://github.com/org/weup-career/actions/workflows/ci.yml/badge.svg)](https://github.com/org/weup-career/actions)
 [![Coverage](https://img.shields.io/badge/coverage-≥95%25-brightgreen)](docs/testing/strategy.md)
 [![Security](https://img.shields.io/badge/security-OWASP%20reviewed-blue)](docs/security/threat-model.md)
 
@@ -10,15 +11,18 @@
 
 ## What it is
 
-A full-stack Todo application with:
+**WeUp Career** giúp học sinh, sinh viên và người đi làm tại Việt Nam khám phá bản thân, định hướng và phát triển sự nghiệp.
 
-- **Multi-user auth** — register, login, JWT + httpOnly cookie session management
-- **Rich todo management** — title, description, priority, due date, status tracking
-- **Tagging** — create tags, assign to todos, filter by tag
-- **Drag-and-drop reorder** — manual ordering persisted server-side
-- **Optimistic updates** — every action responds instantly; network syncs in background
-- **Soft delete + undo** — delete with a 5-second undo window
-- **Keyboard-first UX** — power users never need to reach for the mouse
+> ⚠️ **Trạng thái domain:** Bộ tài liệu thiết kế hiện tại được khởi tạo theo domain *Todo* (bản nháp ban đầu). Domain thật đã chốt là **hướng nghiệp**. Tập tính năng sản phẩm đang được định nghĩa lại (Phase 1 — redesign). Phần hạ tầng kỹ thuật bên dưới (stack, CI/CD, quality gates, ADR) tái sử dụng được.
+
+**Định hướng tính năng (đang xác nhận yêu cầu):**
+
+- **Tài khoản đa người dùng** — đăng ký, đăng nhập, quản lý phiên JWT + cookie httpOnly _(reusable)_
+- **Hồ sơ hướng nghiệp** — phân theo 2 nhóm: học sinh/sinh viên và người đi làm
+- **Trắc nghiệm định hướng** — ví dụ Holland/RIASEC, MBTI _(chờ chốt phạm vi)_
+- **Tư vấn chọn ngành / chọn trường** — phù hợp bối cảnh tuyển sinh Việt Nam _(chờ chốt)_
+- **Lộ trình kỹ năng & nghề nghiệp** — gợi ý bước phát triển _(chờ chốt)_
+- **Kết nối mentor / thông tin thị trường lao động** _(chờ chốt)_
 
 ---
 
@@ -43,12 +47,12 @@ A full-stack Todo application with:
 **Requirements:** Docker + Docker Compose
 
 ```bash
-git clone https://github.com/org/todo-app.git && cd todo-app
+git clone https://github.com/org/weup-career.git && cd weup-career
 cp .env.example .env          # Edit SECRET_KEY with a random value
 docker compose up --build
 ```
 
-Open **http://localhost** — register an account — start adding todos.
+Open **http://localhost** — register an account to get started.
 
 API documentation: **http://localhost/api/v1/docs**
 
@@ -85,18 +89,17 @@ This project follows the [Diátaxis](https://diataxis.fr/) documentation framewo
 ## Project Structure
 
 ```
-todo-app/
+weup-career/
 ├── backend/                    # FastAPI application
 │   ├── app/
 │   │   ├── auth/               # Authentication & authorization
-│   │   ├── todos/              # Todo CRUD + reorder
-│   │   ├── tags/               # Tag management
+│   │   ├── <domain>/           # Feature modules (career domain — TBD redesign)
 │   │   └── core/               # Config, DB, logging, middleware
 │   ├── migrations/             # Alembic database migrations
 │   └── tests/                  # pytest unit + integration tests
 ├── frontend/                   # React SPA
 │   ├── src/
-│   │   ├── features/           # Auth, todos, tags feature modules
+│   │   ├── features/           # Auth + career-domain feature modules (TBD redesign)
 │   │   ├── components/         # Shared UI components
 │   │   ├── api/                # Typed API client
 │   │   └── store/              # Zustand state stores
@@ -139,7 +142,7 @@ docker compose exec frontend npx tsc --noEmit
 
 # Security scan
 docker compose exec backend pip-audit
-trivy image todo-backend:latest
+trivy image weup-career-backend:latest
 ```
 
 ---
@@ -193,4 +196,4 @@ MIT — see [LICENSE](LICENSE)
 
 ---
 
-> **Status:** Phase 1 (Planning) complete. Awaiting implementation approval.
+> **Status:** Đã đổi thương hiệu sang **WeUp Career**. Hạ tầng kỹ thuật + ADR tái sử dụng. Domain nghiệp vụ (spec, kiến trúc, TLA+, UX) đang được thiết kế lại từ Todo → Hướng nghiệp.

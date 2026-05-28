@@ -124,7 +124,7 @@ services:
     depends_on: [backend]
 
   backend:
-    image: ghcr.io/org/todo-backend:${VERSION}
+    image: ghcr.io/org/weup-career-backend:${VERSION}
     volumes:
       - app_data:/data
     environment:

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# =============================================================================
+# post-create-hook.sh — OPTIONAL per-project bootstrap
+# =============================================================================
+# Rename to `post-create-hook.sh` (drop .example) to activate.
+#
+# Runs INSIDE the container, at the end of the baked
+# /usr/local/bin/devcontainer-post-create.sh. The baked script handles:
+#   - ruflo init (writes CLAUDE.md, registers ruflo MCP)
+#   - Specula MCP registration
+#   - Dark Factory skill symlinks
+#   - CLAUDE.skills.md seed + @-import injection into CLAUDE.md
+#
+# Use this hook for project-specific bootstrap the image doesn't know about:
+#   - go mod download / pnpm install / pip install
+#   - DB migrations, fixture seeding
+#   - vendoring private deps from a corporate registry
+#
+# Non-fatal: a failure here does NOT block the container from starting.
+# =============================================================================
+set -e
+
+# Example: Go modules
+# if [ -f "go.mod" ]; then
+#     echo "↓ Downloading Go modules..."
+#     timeout 120s go mod download || echo "⚠ go mod download timed out — continuing"
+# fi
+
+# Example: UI deps
+# if [ -f "ui/package.json" ]; then
+#     COREPACK_ENABLE_DOWNLOAD_PROMPT=0 timeout 300s pnpm --dir ui install --frozen-lockfile \
+#         || echo "⚠ pnpm install timed out — continuing"
+# fi
+
+# Example: Python venv
+# if [ -f "pyproject.toml" ] && [ ! -d ".venv" ]; then
+#     python3 -m venv .venv && .venv/bin/pip install -e .
+# fi
+
+echo "[post-create-hook] no-op (edit to add project-specific bootstrap)"

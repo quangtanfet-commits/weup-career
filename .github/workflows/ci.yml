@@ -1,0 +1,417 @@
+name: CI — Quality Gate
+
+on:
+  push:
+    branches: [main, "feat/**", "fix/**", "chore/**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+# ─── JOBS RUN IN PARALLEL ─────────────────────────────────────
+jobs:
+
+  # ── 1. Backend — Lint & Type Check ──────────────────────────
+  lint-backend:
+    name: "🔍 Backend Lint & Types"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('backend/pyproject.toml') }}
+          restore-keys: uv-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Ruff lint
+        run: ruff check app/ tests/
+
+      - name: Ruff format check
+        run: ruff format --check app/ tests/
+
+      - name: mypy strict
+        run: mypy app/ --strict --ignore-missing-imports
+
+      - name: Bandit security lint
+        run: bandit -ll -r app/
+
+  # ── 2. Frontend — Lint & Type Check ─────────────────────────
+  lint-frontend:
+    name: "🔍 Frontend Lint & Types"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        run: npx eslint src/ --max-warnings 0
+
+      - name: Prettier check
+        run: npx prettier --check "src/**/*.{ts,tsx,css}"
+
+  # ── 3. Backend — Tests & Coverage ───────────────────────────
+  test-backend:
+    name: "🧪 Backend Tests"
+    runs-on: ubuntu-latest
+    needs: [lint-backend]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('backend/pyproject.toml') }}
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Run tests with coverage
+        env:
+          SECRET_KEY: ci-test-secret-key-not-for-production-use
+          ENVIRONMENT: test
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+        run: |
+          pytest tests/ \
+            --cov=app \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=95 \
+            -v \
+            --tb=short
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: backend/coverage.xml
+          flags: backend
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # ── 4. Frontend — Tests & Coverage ──────────────────────────
+  test-frontend:
+    name: "🧪 Frontend Tests"
+    runs-on: ubuntu-latest
+    needs: [lint-frontend]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage -- --reporter=verbose
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: frontend/coverage/lcov.info
+          flags: frontend
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # ── 5. Security Scan ─────────────────────────────────────────
+  security:
+    name: "🔒 Security Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Semgrep SAST
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/python
+            p/react
+            p/security-audit
+            p/secrets
+          generateSarif: "1"
+
+      - name: Upload Semgrep SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+        if: always()
+
+      - name: Python dependency audit
+        working-directory: backend
+        run: |
+          pip install pip-audit
+          pip-audit --requirement <(pip install uv && uv pip compile pyproject.toml) \
+            --ignore-vuln GHSA-xxxxxxxx || true  # list specific ignored CVEs
+
+      - name: Node dependency audit
+        working-directory: frontend
+        run: npm audit --audit-level high
+
+  # ── 6. TLA+ Formal Verification ─────────────────────────────
+  formal-verification:
+    name: "🔢 TLA+ Model Check"
+    runs-on: ubuntu-latest
+    # Only run when TLA+ specs or implementation changes
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if TLA+ files changed
+        id: tla-changed
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            tla/**/*.tla
+            tla/**/*.cfg
+            backend/app/auth/**
+            backend/app/todos/**
+
+      - name: Download TLA+ tools
+        if: steps.tla-changed.outputs.any_changed == 'true'
+        run: |
+          wget -q https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar \
+            -O /tmp/tla2tools.jar
+
+      - name: Run TLC — TodoStateMachine
+        if: steps.tla-changed.outputs.any_changed == 'true'
+        run: |
+          java -jar /tmp/tla2tools.jar \
+            -config tla/TodoStateMachine.cfg \
+            tla/TodoStateMachine.tla 2>&1 | tee tla-todo.log
+          grep -q "Model checking completed" tla-todo.log
+
+      - name: Run TLC — AuthTokenLifecycle
+        if: steps.tla-changed.outputs.any_changed == 'true'
+        run: |
+          java -jar /tmp/tla2tools.jar \
+            -config tla/AuthTokenLifecycle.cfg \
+            tla/AuthTokenLifecycle.tla 2>&1 | tee tla-auth.log
+          grep -q "Model checking completed" tla-auth.log
+
+  # ── 7. E2E Tests (Playwright) ────────────────────────────────
+  e2e:
+    name: "🎭 E2E Tests — ${{ matrix.browser }}"
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Node deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Build & start Docker stack for E2E
+        env:
+          SECRET_KEY: ci-e2e-test-secret-not-for-production
+          ENVIRONMENT: test
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build
+          # Wait for health
+          timeout 60 bash -c 'until curl -sf http://localhost/api/v1/ready; do sleep 2; done'
+
+      - name: Run Playwright E2E
+        working-directory: frontend
+        env:
+          BASE_URL: http://localhost
+        run: npx playwright test --project=${{ matrix.browser }} --reporter=html
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+
+      - name: Stop Docker stack
+        if: always()
+        run: docker compose down
+
+  # ── 8. Container Image Build & Scan ─────────────────────────
+  build-and-scan:
+    name: "🐳 Build & Scan Images"
+    runs-on: ubuntu-latest
+    needs: [lint-backend, lint-frontend]
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    outputs:
+      backend-tag: ${{ steps.meta-backend.outputs.tags }}
+      frontend-tag: ${{ steps.meta-frontend.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Backend image metadata
+      - name: Backend image metadata
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
+      # Frontend image metadata
+      - name: Frontend image metadata
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
+      # Build backend
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: backend
+          target: production
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:buildcache,mode=max
+
+      # Build frontend
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: frontend
+          target: production
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:buildcache,mode=max
+
+      # Trivy scan — backend
+      - name: Trivy scan — backend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:sha-${{ github.sha }}
+          format: sarif
+          output: trivy-backend.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+        if: github.event_name != 'pull_request'
+
+      # Trivy scan — frontend
+      - name: Trivy scan — frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:sha-${{ github.sha }}
+          format: sarif
+          output: trivy-frontend.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+        if: github.event_name != 'pull_request'
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: |
+            trivy-backend.sarif
+            trivy-frontend.sarif
+        if: always() && github.event_name != 'pull_request'
+
+  # ── 9. PR Summary ─────────────────────────────────────────────
+  ci-summary:
+    name: "✅ CI Gate — All Passed"
+    runs-on: ubuntu-latest
+    needs:
+      - lint-backend
+      - lint-frontend
+      - test-backend
+      - test-frontend
+      - security
+      - e2e
+      - build-and-scan
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "❌ One or more CI jobs failed"
+            exit 1
+          fi
+          echo "✅ All CI jobs passed — PR is mergeable"

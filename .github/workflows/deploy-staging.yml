@@ -1,0 +1,64 @@
+name: Deploy — Staging
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  deploy-staging:
+    name: "🚀 Deploy to Staging"
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          envs: REGISTRY,IMAGE_PREFIX,GITHUB_SHA
+          script: |
+            set -e
+            cd /home/deploy/todo-app
+
+            # Pull latest code (docker-compose files)
+            git pull origin main
+
+            # Update image tags
+            export BACKEND_IMAGE="${REGISTRY}/${IMAGE_PREFIX}/backend:sha-${GITHUB_SHA}"
+            export FRONTEND_IMAGE="${REGISTRY}/${IMAGE_PREFIX}/frontend:sha-${GITHUB_SHA}"
+
+            # Login to GHCR
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull and restart
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps backend
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps nginx
+
+            echo "Deployed sha-${GITHUB_SHA} to staging ✅"
+
+      - name: Smoke test staging
+        run: |
+          sleep 10  # Wait for containers to start
+          curl -sf ${{ vars.STAGING_URL }}/api/v1/health | jq '.status' | grep '"ok"'
+          curl -sf ${{ vars.STAGING_URL }}/api/v1/ready | jq '.status' | grep '"ready"'
+          echo "✅ Staging smoke tests passed"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Staging deployment failed for sha-${{ github.sha }}"
+          # Add Slack/email notification here

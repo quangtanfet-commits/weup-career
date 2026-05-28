@@ -1,0 +1,58 @@
+version: 2
+updates:
+  # Python backend
+  - package-ecosystem: pip
+    directory: "/backend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Asia/Ho_Chi_Minh"
+    labels:
+      - dependencies
+      - backend
+    open-pull-requests-limit: 5
+    groups:
+      python-minor:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Pin major versions manually — review before upgrading
+      - dependency-name: "fastapi"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "sqlalchemy"
+        update-types: ["version-update:semver-major"]
+
+  # Node.js frontend
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Asia/Ho_Chi_Minh"
+    labels:
+      - dependencies
+      - frontend
+    open-pull-requests-limit: 5
+    groups:
+      node-minor:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@tanstack/*"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci

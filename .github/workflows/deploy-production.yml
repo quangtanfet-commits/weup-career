@@ -1,0 +1,97 @@
+name: Deploy — Production
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"   # e.g. v1.0.0, v1.2.3
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  deploy-production:
+    name: "🏭 Deploy to Production"
+    runs-on: ubuntu-latest
+    # Manual approval required — configure in GitHub Environments settings
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate tag format
+        run: |
+          TAG=${{ github.ref_name }}
+          echo "Deploying tag: $TAG"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid tag format: $TAG"
+            exit 1
+          fi
+
+      - name: Extract version
+        id: version
+        run: echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          envs: REGISTRY,IMAGE_PREFIX
+          script: |
+            set -e
+            cd /home/deploy/todo-app
+
+            export VERSION="${{ steps.version.outputs.version }}"
+            export BACKEND_IMAGE="${REGISTRY}/${IMAGE_PREFIX}/backend:${VERSION}"
+            export FRONTEND_IMAGE="${REGISTRY}/${IMAGE_PREFIX}/frontend:${VERSION}"
+
+            # Login to GHCR
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull tagged images
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+
+            # Graceful rolling restart
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              up -d --no-deps --no-recreate backend
+
+            # Wait for new backend to be healthy
+            sleep 15
+            curl -sf http://localhost/api/v1/ready || exit 1
+
+            # Restart nginx to pick up any static asset changes
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              up -d --no-deps nginx
+
+            echo "Deployed ${VERSION} to production ✅"
+
+      - name: Production smoke test
+        run: |
+          sleep 10
+          curl -sf ${{ vars.PRODUCTION_URL }}/api/v1/health | jq '.status' | grep '"ok"'
+          curl -sf ${{ vars.PRODUCTION_URL }}/api/v1/ready | jq '.status' | grep '"ready"'
+          echo "✅ Production smoke tests passed"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Release ${{ steps.version.outputs.version }}"
+          body: |
+            ## What's Changed
+
+            See [CHANGELOG.md](CHANGELOG.md) for details.
+
+            ## Images
+            - Backend: `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${{ steps.version.outputs.version }}`
+            - Frontend: `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${{ steps.version.outputs.version }}`
+          generate_release_notes: true
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ PRODUCTION deployment failed for ${{ steps.version.outputs.version }}"
+          echo "⚠️  Manual rollback may be required — see runbook"
+          # Add PagerDuty/Slack alert here

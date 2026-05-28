@@ -1,0 +1,28 @@
+# CODEOWNERS
+# Each line: <pattern> <@owner(s)>
+# Owners are automatically requested for review when their files change.
+# Update with actual GitHub usernames before going live.
+
+# Global default — all files
+*                          @org/todo-core
+
+# Backend
+backend/                   @org/todo-backend
+backend/app/auth/          @org/todo-security @org/todo-backend
+backend/app/core/security* @org/todo-security
+
+# Frontend
+frontend/                  @org/todo-frontend
+
+# Infrastructure & CI
+.github/                   @org/todo-devops @org/todo-core
+docker-compose*.yml        @org/todo-devops
+nginx/                     @org/todo-devops
+
+# Security & compliance
+docs/security/             @org/todo-security
+docs/formal-verification/  @org/todo-core
+tla/                       @org/todo-core
+
+# ADRs require lead review
+docs/adr/                  @org/todo-core

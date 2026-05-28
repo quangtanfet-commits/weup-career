@@ -1,0 +1,160 @@
+# =============================================================
+# Todo Application — .gitignore
+# Covers: Python/FastAPI, Node/React/Vite, Docker, editors
+# =============================================================
+
+# ─── Environment & Secrets ────────────────────────────────────
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+secret_key.txt
+
+# ─── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.virtualenv/
+
+# Type checker caches
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyright/
+.pyre/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+coverage/
+htmlcov/
+*.cover
+*.py,cover
+.hypothesis/
+.tox/
+nosetests.xml
+test-results/
+
+# ─── Node / Frontend ─────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Build outputs
+frontend/dist/
+frontend/build/
+frontend/.vite/
+*.local
+
+# Vite cache
+frontend/.cache/
+
+# Testing
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+
+# ─── Docker ──────────────────────────────────────────────────
+# Local override files (prod configs tracked, local overrides not)
+docker-compose.local.yml
+docker-compose.override.yml
+
+# ─── Database ────────────────────────────────────────────────
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/
+
+# ─── Logs ────────────────────────────────────────────────────
+*.log
+logs/
+log/
+
+# ─── OS ──────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ─── Editors & IDEs ──────────────────────────────────────────
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.code-workspace
+
+# ─── CI / Tooling ────────────────────────────────────────────
+.semgrep/
+.trivy/
+zap-reports/
+k6-results/
+
+# ─── TLA+ ────────────────────────────────────────────────────
+tla/*.toolbox/
+tla/states/
+*.tla.bak
+*.cfg.bak
+
+# ─── Backup files ────────────────────────────────────────────
+*.bak
+*.backup
+*.orig
+*.tmp
+
+# ─── Claude Code tooling (system-level, not project code) ────
+# Project-level Claude settings are kept; system tooling is not.
+/.claude/skills/
+/.claude/commands/
+/.claude/helpers/
+/.claude/agents/
+/.claude/projects/
+
+# claude-flow metrics & tooling (auto-generated, not source)
+/.claude-flow/

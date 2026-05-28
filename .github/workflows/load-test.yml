@@ -1,0 +1,52 @@
+name: Performance — Load Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Target URL to load test"
+        required: true
+        default: "https://staging.example.com"
+      scenario:
+        description: "k6 scenario to run"
+        required: true
+        default: "baseline"
+        type: choice
+        options: [baseline, spike, soak]
+
+jobs:
+  load-test:
+    name: "⚡ k6 Load Test — ${{ inputs.scenario }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run k6 load test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: k6/scenarios/${{ inputs.scenario }}.js
+          flags: --out json=k6-results.json
+        env:
+          BASE_URL: ${{ inputs.target_url }}
+
+      - name: Upload k6 results
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results-${{ inputs.scenario }}
+          path: k6-results.json
+
+      - name: Check thresholds
+        run: |
+          # Parse results and fail if p99 > 100ms
+          node -e "
+            const fs = require('fs');
+            const data = fs.readFileSync('k6-results.json','utf8').trim().split('\n');
+            const metrics = data.map(l => JSON.parse(l)).filter(d => d.type === 'Point');
+            const durations = metrics
+              .filter(d => d.metric === 'http_req_duration')
+              .map(d => d.data.value);
+            const p99 = durations.sort((a,b)=>a-b)[Math.floor(durations.length*0.99)];
+            console.log('p99 latency:', p99.toFixed(2) + 'ms');
+            if (p99 > 100) { console.error('❌ p99 exceeds 100ms'); process.exit(1); }
+            console.log('✅ p99 within threshold');
+          "

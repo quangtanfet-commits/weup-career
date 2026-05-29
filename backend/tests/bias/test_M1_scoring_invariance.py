@@ -41,6 +41,25 @@ def test_scorer_signatures_take_only_answers() -> None:
             assert attr not in params
 
 
+def test_engine_signature_takes_no_protected_attr() -> None:
+    """The recommendation engine signature never names a protected attribute (M1).
+
+    ``recommend(profile, *, careers, pathways)`` — its only inputs are the
+    profile snapshot and the candidate reference data. A protected attribute
+    cannot even be passed, which makes a counterfactual flip (M2) structural.
+    """
+    from app.reco.engine import RecoProfile, recommend
+
+    params = list(inspect.signature(recommend).parameters)
+    assert params == ["profile", "careers", "pathways"], params
+    for attr in _PROTECTED:
+        assert attr not in params
+
+    # RecoProfile — the engine input — has no protected-attribute field either.
+    profile_fields = set(RecoProfile.__dataclass_fields__)
+    assert not (profile_fields & set(_PROTECTED)), profile_fields
+
+
 # Likert answers keyed by realistic item keys across all instruments.
 _item_keys = st.sampled_from(
     ["R_1", "I_1", "A_1", "S_1", "E_1", "C_1", "V_1", "P_1", "N_1", "T_1", "J_1"]

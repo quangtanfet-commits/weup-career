@@ -161,3 +161,17 @@ class ContentStatus(StrEnum):
     DRAFT = "draft"
     PUBLISHED = "published"
     ARCHIVED = "archived"
+
+
+class RecoDecision(StrEnum):
+    """Human decision recorded on a ``Recommendation`` (CP-5, ADR-012).
+
+    A recommendation becomes *effective* only once a person (the owner, a
+    guardian, or a counselor) writes one of these via ``POST
+    /recommendations/{id}/confirm``. The system NEVER sets it on its own —
+    that is the human-in-the-loop invariant (spec.md §8 CP-5).
+    """
+
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    DEFERRED = "deferred"

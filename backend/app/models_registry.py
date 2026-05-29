@@ -27,6 +27,7 @@ from app.competency.models import (
 from app.core.audit_models import AuditLog
 from app.core.database import Base
 from app.guardians.models import GuardianConsent, GuardianLink
+from app.reco.models import Recommendation
 
 __all__ = [
     "AssessmentInstrument",
@@ -44,6 +45,7 @@ __all__ = [
     "LearnerDomainPhase",
     "LearnerProgress",
     "Pathway",
+    "Recommendation",
     "RefreshToken",
     "User",
 ]

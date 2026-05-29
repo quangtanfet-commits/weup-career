@@ -13,6 +13,7 @@ from app.careers.router import router as career_router
 from app.competency.router import router as competency_router
 from app.core.database import Database
 from app.guardians.router import router as guardian_router
+from app.reco.router import router as reco_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -21,6 +22,7 @@ api_router.include_router(guardian_router)
 api_router.include_router(assessment_router)
 api_router.include_router(competency_router)
 api_router.include_router(career_router)
+api_router.include_router(reco_router)
 
 
 @api_router.get("/health", tags=["ops"])

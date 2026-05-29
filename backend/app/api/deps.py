@@ -151,7 +151,5 @@ async def require_career_data_consent(
     Re-validates against the DB regardless of the (possibly stale) JWT claim.
     Wire this into assessment/recommendation/progress routes in later slices.
     """
-    await require_consent(
-        user_id=current.id, age_band=current.age_band, guardian_repo=guardians
-    )
+    await require_consent(user_id=current.id, age_band=current.age_band, guardian_repo=guardians)
     return current

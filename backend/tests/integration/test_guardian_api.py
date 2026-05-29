@@ -17,9 +17,7 @@ async def _register(client: AsyncClient, **kw: str) -> dict[str, str]:
 
 
 async def _token(client: AsyncClient, email: str, password: str = "Password123") -> str:
-    login = await client.post(
-        "/api/v1/auth/login", json={"email": email, "password": password}
-    )
+    login = await client.post("/api/v1/auth/login", json={"email": email, "password": password})
     return login.json()["access_token"]
 
 
@@ -31,7 +29,9 @@ async def _setup_child_and_guardian(
     client: AsyncClient,
 ) -> tuple[dict[str, str], str, str]:
     child = await _register(
-        client, email="child@example.com", dob=child_dob(12),
+        client,
+        email="child@example.com",
+        dob=child_dob(12),
         school_level="lower_secondary",
     )
     await _register(client, email="parent@example.com", dob="1985-01-01")
@@ -68,7 +68,9 @@ async def test_full_consent_flow_activates_child_cp1(client: AsyncClient) -> Non
 async def test_self_consent_forbidden(client: AsyncClient) -> None:
     """A child inviting itself as guardian is rejected (ADR-010)."""
     await _register(
-        client, email="kid@example.com", dob=child_dob(12),
+        client,
+        email="kid@example.com",
+        dob=child_dob(12),
         school_level="lower_secondary",
     )
     token = await _token(client, "kid@example.com")
@@ -83,7 +85,9 @@ async def test_self_consent_forbidden(client: AsyncClient) -> None:
 
 async def test_invite_unknown_guardian_404(client: AsyncClient) -> None:
     await _register(
-        client, email="kid2@example.com", dob=child_dob(12),
+        client,
+        email="kid2@example.com",
+        dob=child_dob(12),
         school_level="lower_secondary",
     )
     token = await _token(client, "kid2@example.com")
@@ -99,9 +103,7 @@ async def test_duplicate_invite_409(client: AsyncClient) -> None:
     _, child_token, _ = await _setup_child_and_guardian(client)
     body = {"guardian_email": "parent@example.com", "relationship": "mother"}
     await client.post("/api/v1/guardians/invite", json=body, headers=_auth(child_token))
-    resp = await client.post(
-        "/api/v1/guardians/invite", json=body, headers=_auth(child_token)
-    )
+    resp = await client.post("/api/v1/guardians/invite", json=body, headers=_auth(child_token))
     assert resp.status_code == 409
 
 

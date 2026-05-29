@@ -117,9 +117,7 @@ class GuardianService:
         trace_emit("GrantConsent", user=link.child_user_id, state={"consent": "active"})
         return consent
 
-    async def revoke_consent(
-        self, *, guardian_user_id: str, child_user_id: str
-    ) -> None:
+    async def revoke_consent(self, *, guardian_user_id: str, child_user_id: str) -> None:
         link = await self._guardians.get_link_for_child_guardian(
             child_user_id=child_user_id, guardian_user_id=guardian_user_id
         )

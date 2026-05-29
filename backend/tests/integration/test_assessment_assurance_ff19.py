@@ -40,7 +40,8 @@ async def _make_child_with_low_consent(client: AsyncClient) -> str:
     await client.post(
         "/api/v1/auth/register",
         json=register_payload(
-            email="child@example.com", dob=child_dob(12),
+            email="child@example.com",
+            dob=child_dob(12),
             school_level="lower_secondary",
         ),
     )

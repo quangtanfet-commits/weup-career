@@ -23,8 +23,12 @@ async def test_list_items_returns_seeded_items(session: AsyncSession) -> None:
     for key, prompt in RIASEC_ITEMS.items():
         session.add(
             AssessmentItem(
-                id=new_uuid(), instrument_id=inst.id, item_key=key,
-                competency_code="NL1", dieu5_code="b", prompt_vi=prompt,
+                id=new_uuid(),
+                instrument_id=inst.id,
+                item_key=key,
+                competency_code="NL1",
+                dieu5_code="b",
+                prompt_vi=prompt,
             )
         )
     await session.flush()

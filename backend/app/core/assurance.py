@@ -38,6 +38,4 @@ def require_assurance(level: AssuranceLevel | None, minimum: AssuranceLevel) -> 
     """
     effective = level if level is not None else AssuranceLevel.LOW
     if not meets_minimum(effective, minimum):
-        raise AssuranceTooLowError(
-            details={"required": minimum.value, "actual": effective.value}
-        )
+        raise AssuranceTooLowError(details={"required": minimum.value, "actual": effective.value})

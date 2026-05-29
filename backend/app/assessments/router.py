@@ -66,9 +66,7 @@ async def get_result(
     current: CurrentUser = Depends(require_career_data_consent),
     service: AssessmentService = Depends(assessment_service),
 ) -> ResultDetailOut:
-    result, payload = await service.read_result(
-        user_id=current.id, result_id=result_id
-    )
+    result, payload = await service.read_result(user_id=current.id, result_id=result_id)
     return ResultDetailOut(
         id=result.id,
         instrument_id=result.instrument_id,
@@ -79,9 +77,7 @@ async def get_result(
     )
 
 
-@router.delete(
-    "/me/assessments/{result_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/me/assessments/{result_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_result(
     result_id: str = Path(...),
     current: CurrentUser = Depends(get_current_user),

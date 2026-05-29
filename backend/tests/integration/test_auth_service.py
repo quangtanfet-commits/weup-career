@@ -47,17 +47,13 @@ async def _make_user(session: AsyncSession) -> User:
     return user
 
 
-async def test_refresh_unknown_token_raises(
-    session: AsyncSession, settings: Settings
-) -> None:
+async def test_refresh_unknown_token_raises(session: AsyncSession, settings: Settings) -> None:
     svc = _service(session, settings)
     with pytest.raises(TokenError):
         await svc.refresh("never-issued-token")
 
 
-async def test_refresh_expired_token_raises(
-    session: AsyncSession, settings: Settings
-) -> None:
+async def test_refresh_expired_token_raises(session: AsyncSession, settings: Settings) -> None:
     svc = _service(session, settings)
     user = await _make_user(session)
     raw = "expired-raw-token"
@@ -75,9 +71,7 @@ async def test_refresh_expired_token_raises(
         await svc.refresh(raw)
 
 
-async def test_refresh_with_missing_user_raises(
-    session: AsyncSession, settings: Settings
-) -> None:
+async def test_refresh_with_missing_user_raises(session: AsyncSession, settings: Settings) -> None:
     svc = _service(session, settings)
     raw = "orphan-token"
     session.add(
@@ -94,24 +88,18 @@ async def test_refresh_with_missing_user_raises(
         await svc.refresh(raw)
 
 
-async def test_logout_noop_on_empty_token(
-    session: AsyncSession, settings: Settings
-) -> None:
+async def test_logout_noop_on_empty_token(session: AsyncSession, settings: Settings) -> None:
     svc = _service(session, settings)
     await svc.logout(None)
     await svc.logout("")  # both are no-ops, no exception
 
 
-async def test_logout_noop_on_unknown_token(
-    session: AsyncSession, settings: Settings
-) -> None:
+async def test_logout_noop_on_unknown_token(session: AsyncSession, settings: Settings) -> None:
     svc = _service(session, settings)
     await svc.logout("not-a-real-token")
 
 
-async def test_full_register_login_refresh_cycle(
-    session: AsyncSession, settings: Settings
-) -> None:
+async def test_full_register_login_refresh_cycle(session: AsyncSession, settings: Settings) -> None:
     svc = _service(session, settings)
     user = await svc.register(
         RegisterRequest(

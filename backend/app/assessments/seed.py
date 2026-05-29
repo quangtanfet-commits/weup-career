@@ -81,13 +81,17 @@ async def seed_instruments(session: AsyncSession) -> dict[str, str]:
     ids: dict[str, str] = {}
     for itype in InstrumentType:
         existing = (
-            await session.execute(
-                select(AssessmentInstrument).where(
-                    AssessmentInstrument.type == itype,
-                    AssessmentInstrument.version == INSTRUMENT_VERSION,
+            (
+                await session.execute(
+                    select(AssessmentInstrument).where(
+                        AssessmentInstrument.type == itype,
+                        AssessmentInstrument.version == INSTRUMENT_VERSION,
+                    )
                 )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         if existing is not None:
             ids[itype.value] = existing.id
             continue

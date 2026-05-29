@@ -101,18 +101,14 @@ async def seeded_instruments(db: Database) -> dict[str, str]:
 
 
 @pytest_asyncio.fixture
-async def client(
-    settings: Settings, db: Database
-) -> AsyncGenerator[AsyncClient, None]:
+async def client(settings: Settings, db: Database) -> AsyncGenerator[AsyncClient, None]:
     app = create_app(settings)
     app.state.db = db
     transport = ASGITransport(app=app)
     async with LifespanManager(app):
         # Re-attach our test DB (lifespan creates its own otherwise).
         app.state.db = db
-        async with AsyncClient(
-            transport=transport, base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
 
 

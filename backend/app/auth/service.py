@@ -82,9 +82,7 @@ class AuthService:
         user = User(
             id=new_uuid(),
             email=payload.email,
-            hashed_password=hash_password(
-                payload.password, rounds=self._settings.bcrypt_rounds
-            ),
+            hashed_password=hash_password(payload.password, rounds=self._settings.bcrypt_rounds),
             date_of_birth=payload.date_of_birth,
             age_band=age_band,
             user_type=payload.user_type,
@@ -120,15 +118,14 @@ class AuthService:
             )
             raise InvalidCredentialsError()
 
-        tokens = await self._issue_session(
-            user, user_agent=user_agent, ip_address=ip_address
-        )
+        tokens = await self._issue_session(user, user_agent=user_agent, ip_address=ip_address)
         await self._audit.record(
             action="auth.login.succeeded", actor_id=user.id, target_type="User"
         )
         # Gate B trace: spec action Issue (new active token for the user).
         trace_emit(
-            "Issue", user=user.id,
+            "Issue",
+            user=user.id,
             state={"token": token_label(hash_refresh_token(tokens.refresh_token))},
         )
         return tokens
@@ -177,7 +174,8 @@ class AuthService:
         )
         # Gate B trace: spec action Rotate (old revoked + new active, atomic — CP-7).
         trace_emit(
-            "Rotate", user=user.id,
+            "Rotate",
+            user=user.id,
             state={
                 "old": token_label(stored.token_hash),
                 "new": token_label(hash_refresh_token(tokens.refresh_token)),
@@ -198,7 +196,8 @@ class AuthService:
             )
             # Gate B trace: spec action Logout (active token → revoked).
             trace_emit(
-                "Logout", user=stored.user_id,
+                "Logout",
+                user=stored.user_id,
                 state={"token": token_label(stored.token_hash)},
             )
 

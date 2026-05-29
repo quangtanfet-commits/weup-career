@@ -22,9 +22,7 @@ from app.core.models import TimestampMixin, UUIDMixin
 
 class User(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "user"
-    __table_args__ = (
-        Index("ix_user_age_status", "age_band", "account_status"),
-    )
+    __table_args__ = (Index("ix_user_age_status", "age_band", "account_status"),)
 
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(120), nullable=False)

@@ -107,9 +107,7 @@ async def test_grant_then_revoke_when_child_row_missing(session: AsyncSession) -
     await session.execute(delete(User).where(User.id == child.id))
     await session.flush()
 
-    consent = await svc.grant_consent(
-        guardian_user_id=guardian.id, guardian_link_id=link.id
-    )
+    consent = await svc.grant_consent(guardian_user_id=guardian.id, guardian_link_id=link.id)
     assert consent.status.value == "active"
     # Revoke also tolerates the missing child row.
     await svc.revoke_consent(guardian_user_id=guardian.id, child_user_id=child.id)

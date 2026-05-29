@@ -39,9 +39,7 @@ def test_riasec_rejects_bool_answers() -> None:
 
 def test_riasec_ignores_non_int_answer_values() -> None:
     # Non-int values (str/float/None) are ignored, never raise.
-    result = score_riasec(
-        {"R_1": "5", "R_2": 4, "I_1": None, "A_1": 2.5}
-    )
+    result = score_riasec({"R_1": "5", "R_2": 4, "I_1": None, "A_1": 2.5})
     assert result["scores"]["R"] == 4  # only R_2=4 counts
     assert result["scores"]["I"] == 0
     assert result["scores"]["A"] == 0
@@ -55,10 +53,14 @@ def test_vips_dominant() -> None:
 
 def test_mbti_four_letter_code() -> None:
     answers = {
-        "E_1": 5, "I_1": 1,  # E
-        "S_1": 1, "N_1": 5,  # N
-        "T_1": 5, "F_1": 1,  # T
-        "J_1": 1, "P_1": 5,  # P
+        "E_1": 5,
+        "I_1": 1,  # E
+        "S_1": 1,
+        "N_1": 5,  # N
+        "T_1": 5,
+        "F_1": 1,  # T
+        "J_1": 1,
+        "P_1": 5,  # P
     }
     result = score_mbti(answers)
     assert result["type"] == "mbti"

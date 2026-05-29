@@ -31,9 +31,7 @@ from app.core.models import UUIDMixin, utcnow
 
 class AssessmentInstrument(UUIDMixin, Base):
     __tablename__ = "assessment_instrument"
-    __table_args__ = (
-        Index("ix_assessment_instrument_type_active", "type", "is_active"),
-    )
+    __table_args__ = (Index("ix_assessment_instrument_type_active", "type", "is_active"),)
 
     type: Mapped[InstrumentType] = mapped_column(Enum(InstrumentType), nullable=False)
     version: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -42,9 +40,7 @@ class AssessmentInstrument(UUIDMixin, Base):
 
 class AssessmentItem(UUIDMixin, Base):
     __tablename__ = "assessment_item"
-    __table_args__ = (
-        Index("ix_assessment_item_instrument", "instrument_id"),
-    )
+    __table_args__ = (Index("ix_assessment_item_instrument", "instrument_id"),)
 
     instrument_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("assessment_instrument.id", ondelete="CASCADE"), nullable=False

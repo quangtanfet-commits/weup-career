@@ -45,9 +45,7 @@ class GuardianLink(UUIDMixin, Base):
 
 class GuardianConsent(UUIDMixin, Base):
     __tablename__ = "guardian_consent"
-    __table_args__ = (
-        Index("ix_guardian_consent_child_status", "child_user_id", "status"),
-    )
+    __table_args__ = (Index("ix_guardian_consent_child_status", "child_user_id", "status"),)
 
     child_user_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("user.id", ondelete="CASCADE"), nullable=False

@@ -78,9 +78,7 @@ class AssessmentService:
         payload = score(instrument_type, answers)
         ciphertext = self._crypto.encrypt(json.dumps(payload, separators=(",", ":")))
 
-        version = await self._assessments.next_version(
-            user_id=user_id, instrument_id=instrument.id
-        )
+        version = await self._assessments.next_version(user_id=user_id, instrument_id=instrument.id)
         result = AssessmentResult(
             id=new_uuid(),
             user_id=user_id,
@@ -116,9 +114,7 @@ class AssessmentService:
         audit write happens in the same transaction/session as the read and
         BEFORE the payload is returned: if it raises, the read fails closed.
         """
-        result = await self._assessments.get_owned_result(
-            result_id=result_id, user_id=user_id
-        )
+        result = await self._assessments.get_owned_result(result_id=result_id, user_id=user_id)
         if result is None:
             raise NotFoundError("Không tìm thấy kết quả trắc nghiệm")
 
@@ -136,9 +132,7 @@ class AssessmentService:
 
     async def delete_result(self, *, user_id: str, result_id: str) -> None:
         """Delete a result the caller owns (data-subject right, FR-14)."""
-        result = await self._assessments.get_owned_result(
-            result_id=result_id, user_id=user_id
-        )
+        result = await self._assessments.get_owned_result(result_id=result_id, user_id=user_id)
         if result is None:
             raise NotFoundError("Không tìm thấy kết quả trắc nghiệm")
 

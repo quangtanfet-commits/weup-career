@@ -131,9 +131,7 @@ async def test_me_missing_user_after_delete(client: AsyncClient, db) -> None:  #
     async with db.session_factory() as s:
         await s.execute(delete(User).where(User.email == "adult@example.com"))
         await s.commit()
-    me = await client.get(
-        "/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 404
 
 

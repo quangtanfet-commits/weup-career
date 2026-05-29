@@ -55,9 +55,7 @@ def _coerce_likert(value: object) -> int | None:
     return value
 
 
-def _dimension_totals(
-    answers: Mapping[str, object], dimensions: tuple[str, ...]
-) -> dict[str, int]:
+def _dimension_totals(answers: Mapping[str, object], dimensions: tuple[str, ...]) -> dict[str, int]:
     """Sum Likert answers onto their leading-letter dimension.
 
     An item key ``"<DIM>_<n>"`` contributes to dimension ``<DIM>``. Keys that

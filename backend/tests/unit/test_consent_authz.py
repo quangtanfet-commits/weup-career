@@ -47,10 +47,7 @@ class FakeGuardianRepo:
         self, child_user_id: str, guardian_user_id: str
     ) -> GuardianLink | None:
         for link in self._links:
-            if (
-                link.child_user_id == child_user_id
-                and link.guardian_user_id == guardian_user_id
-            ):
+            if link.child_user_id == child_user_id and link.guardian_user_id == guardian_user_id:
                 return link
         return None
 
@@ -64,9 +61,7 @@ def test_is_under_16() -> None:
 @pytest.mark.asyncio
 async def test_adult_always_allowed() -> None:
     repo = FakeGuardianRepo()
-    assert await can_process_career_data(
-        user_id="a1", age_band=AgeBand.ADULT, guardian_repo=repo
-    )
+    assert await can_process_career_data(user_id="a1", age_band=AgeBand.ADULT, guardian_repo=repo)
     await require_consent(user_id="a1", age_band="adult", guardian_repo=repo)
 
 

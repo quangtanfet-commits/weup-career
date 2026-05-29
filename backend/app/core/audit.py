@@ -62,8 +62,6 @@ class SqlAuditRepo:
 
     async def count_sensitive(self) -> int:
         result = await self._session.execute(
-            select(func.count())
-            .select_from(AuditLog)
-            .where(AuditLog.is_sensitive_access.is_(True))
+            select(func.count()).select_from(AuditLog).where(AuditLog.is_sensitive_access.is_(True))
         )
         return int(result.scalar_one())

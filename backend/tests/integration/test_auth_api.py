@@ -58,17 +58,13 @@ async def test_register_email_normalized(client: AsyncClient) -> None:
     ["short1A", "alllower123", "ALLUPPER123", "NoDigitsHere"],
 )
 async def test_register_weak_password_422(client: AsyncClient, password: str) -> None:
-    resp = await client.post(
-        "/api/v1/auth/register", json=register_payload(password=password)
-    )
+    resp = await client.post("/api/v1/auth/register", json=register_payload(password=password))
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 async def test_register_future_dob_422(client: AsyncClient) -> None:
-    resp = await client.post(
-        "/api/v1/auth/register", json=register_payload(dob="2999-01-01")
-    )
+    resp = await client.post("/api/v1/auth/register", json=register_payload(dob="2999-01-01"))
     assert resp.status_code == 422
 
 
@@ -115,17 +111,13 @@ async def test_me_returns_profile(client: AsyncClient) -> None:
         json={"email": "adult@example.com", "password": "Password123"},
     )
     token = login.json()["access_token"]
-    resp = await client.get(
-        "/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    resp = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     assert resp.json()["email"] == "adult@example.com"
 
 
 async def test_me_bad_token_401(client: AsyncClient) -> None:
-    resp = await client.get(
-        "/api/v1/auth/me", headers={"Authorization": "Bearer not.a.jwt"}
-    )
+    resp = await client.get("/api/v1/auth/me", headers={"Authorization": "Bearer not.a.jwt"})
     assert resp.status_code == 401
 
 
@@ -188,9 +180,7 @@ async def test_reuse_detection_revokes_family_cp7(client: AsyncClient) -> None:
 
 async def test_logout_revokes_refresh(client: AsyncClient) -> None:
     token = await _register_login(client)
-    logout = await client.post(
-        "/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"}
-    )
+    logout = await client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"})
     assert logout.status_code == 204
     resp = await client.post("/api/v1/auth/refresh")
     assert resp.status_code == 401
@@ -201,7 +191,5 @@ async def test_logout_requires_auth(client: AsyncClient) -> None:
 
 
 async def test_correlation_id_echoed(client: AsyncClient) -> None:
-    resp = await client.get(
-        "/api/v1/health", headers={"X-Request-ID": "req_custom_123"}
-    )
+    resp = await client.get("/api/v1/health", headers={"X-Request-ID": "req_custom_123"})
     assert resp.headers["X-Request-ID"] == "req_custom_123"

@@ -37,9 +37,7 @@ def _set_refresh_cookie(response: Response, raw_token: str, settings: Settings) 
     )
 
 
-def _token_response(
-    response: Response, issued: IssuedTokens, settings: Settings
-) -> TokenResponse:
+def _token_response(response: Response, issued: IssuedTokens, settings: Settings) -> TokenResponse:
     _set_refresh_cookie(response, issued.refresh_token, settings)
     return TokenResponse(
         access_token=issued.access_token,

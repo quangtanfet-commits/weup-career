@@ -45,7 +45,5 @@ async def revoke_consent(
     current: CurrentUser = Depends(get_current_user),
     service: GuardianService = Depends(guardian_service),
 ) -> Response:
-    await service.revoke_consent(
-        guardian_user_id=current.id, child_user_id=payload.child_user_id
-    )
+    await service.revoke_consent(guardian_user_id=current.id, child_user_id=payload.child_user_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

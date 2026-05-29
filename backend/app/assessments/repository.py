@@ -81,9 +81,7 @@ class SqlAssessmentRepo:
         current = result.scalar_one_or_none()
         return int(current) + 1 if current is not None else 1
 
-    async def get_owned_result(
-        self, *, result_id: str, user_id: str
-    ) -> AssessmentResult | None:
+    async def get_owned_result(self, *, result_id: str, user_id: str) -> AssessmentResult | None:
         """Fetch a result only if owned by ``user_id`` (CP-4 — no cross-user read)."""
         result = await self._session.execute(
             select(AssessmentResult).where(

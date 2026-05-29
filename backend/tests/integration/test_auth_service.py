@@ -88,6 +88,53 @@ async def test_refresh_with_missing_user_raises(session: AsyncSession, settings:
         await svc.refresh(raw)
 
 
+async def test_refresh_rejected_for_soft_deleted_user(
+    session: AsyncSession, settings: Settings
+) -> None:
+    """A soft-deleted account cannot refresh into a new session (FR-91/92).
+
+    Drives the deleted-user branch directly with a still-live (non-revoked)
+    token: the refresh is rejected and the presented token is revoked.
+    """
+    svc = _service(session, settings)
+    user = await _make_user(session)
+    user.account_status = AccountStatus.DELETED
+    user.is_deleted = True
+    user.deleted_at = utcnow()
+    raw = "live-token-for-deleted-user"
+    token = RefreshToken(
+        id=new_uuid(),
+        user_id=user.id,
+        token_hash=hash_refresh_token(raw),
+        expires_at=datetime.now(UTC) + timedelta(days=1),
+        created_at=utcnow(),
+    )
+    session.add(token)
+    await session.flush()
+
+    with pytest.raises(TokenError):
+        await svc.refresh(raw)
+    assert token.revoked_at is not None
+
+
+async def test_login_rejected_for_soft_deleted_user(
+    session: AsyncSession, settings: Settings
+) -> None:
+    """A soft-deleted account cannot log in even with correct credentials."""
+    from app.core.exceptions import InvalidCredentialsError
+    from app.core.security import hash_password
+
+    svc = _service(session, settings)
+    user = await _make_user(session)
+    user.hashed_password = hash_password("Password123", rounds=settings.bcrypt_rounds)
+    user.account_status = AccountStatus.DELETED
+    user.is_deleted = True
+    await session.flush()
+
+    with pytest.raises(InvalidCredentialsError):
+        await svc.login(LoginRequest(email=user.email, password="Password123"))
+
+
 async def test_logout_noop_on_empty_token(session: AsyncSession, settings: Settings) -> None:
     svc = _service(session, settings)
     await svc.logout(None)

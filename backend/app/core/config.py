@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     # Guardian-consent age boundary (legal-basis §6 / NĐ 147/2024).
     consent_age_threshold: int = 16
 
+    # Account deletion recovery window (FR-91/92, Luật 91/2025). A deleted
+    # account is SOFT-deleted and retained for this many days so the data
+    # subject can recover it; a scheduled purge (``python -m app.account.purge``)
+    # HARD-deletes accounts whose ``deleted_at`` + this window has elapsed.
+    account_recovery_window_days: int = 30
+
     # Minimum guardian-link assurance required to process an under-16's
     # sensitive data (FF-19, guardian-verification.md §2/§9). Default LOW is the
     # documented MVP interim — VNeID is not yet integrated, so email/OTP consent

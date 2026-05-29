@@ -29,6 +29,8 @@ from app.core.exceptions import AuthenticationError
 from app.core.security import decode_access_token
 from app.guardians.repository import SqlGuardianRepo
 from app.guardians.service import GuardianService
+from app.reco.repository import SqlRecoRepo
+from app.reco.service import RecoService
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -94,6 +96,10 @@ def career_repo(session: AsyncSession = Depends(get_session)) -> SqlCareerRepo:
     return SqlCareerRepo(session)
 
 
+def reco_repo(session: AsyncSession = Depends(get_session)) -> SqlRecoRepo:
+    return SqlRecoRepo(session)
+
+
 def field_crypto(settings: Settings = Depends(settings_dep)) -> FieldCrypto:
     return FieldCrypto(settings.field_encryption_key)
 
@@ -146,6 +152,14 @@ def career_service(
     careers: SqlCareerRepo = Depends(career_repo),
 ) -> CareerService:
     return CareerService(careers=careers)
+
+
+def reco_service(
+    recos: SqlRecoRepo = Depends(reco_repo),
+    audit: SqlAuditRepo = Depends(audit_repo),
+    crypto: FieldCrypto = Depends(field_crypto),
+) -> RecoService:
+    return RecoService(reco=recos, audit=audit, crypto=crypto)
 
 
 # -- auth dependencies ----------------------------------------------------

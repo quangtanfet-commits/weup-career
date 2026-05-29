@@ -27,7 +27,11 @@ def emit(event: str, *, user: str, state: dict[str, Any]) -> None:
     path = os.environ.get(_ENV)
     if not path:
         return
-    line = json.dumps({"event": event, "user": user, "state": state}, separators=(",", ":"))
+    # Drop None-valued keys: JSON null is not representable in TLA+ (the Json
+    # module's deserialiser rejects it), and an absent key models "no value" for
+    # the spec replay just as faithfully.
+    clean = {k: v for k, v in state.items() if v is not None}
+    line = json.dumps({"event": event, "user": user, "state": clean}, separators=(",", ":"))
     with open(path, "a", encoding="utf-8") as handle:
         handle.write(line + "\n")
 

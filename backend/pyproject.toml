@@ -59,7 +59,7 @@ ignore = [
 "tests/**" = ["S105", "S106", "S107", "S311"]
 # Bias-metric test filenames are mandated verbatim by docs/testing/bias-testing.md
 # (e.g. test_M1_scoring_invariance.py); keep the spec-aligned uppercase metric id.
-"tests/bias/test_M1_scoring_invariance.py" = ["N999"]
+"tests/bias/test_M*.py" = ["N999"]
 "migrations/**" = ["E501"]
 
 [tool.mypy]

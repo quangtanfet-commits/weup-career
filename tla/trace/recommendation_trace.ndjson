@@ -1,0 +1,2 @@
+{"event":"RecommendationCreated","user":"u1","state":{"reco":"r1","requiresHumanConfirmation":true,"hasRationale":true}}
+{"event":"RecommendationConfirmed","user":"u1","state":{"reco":"r1","confirmedBy":"u1","confirmedDecision":"accepted"}}

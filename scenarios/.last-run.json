@@ -1,6 +1,35 @@
 {
   "runs": [
     {
+      "scope": "slice-5 (recommendation.feature)",
+      "timestamp": "2026-05-29T21:45:00Z",
+      "artifact": "backend/ @ feat/slice5-reco-engine (767788f) — in-process ASGI (real app/DB/auth/consent/audit) + Gate A/B TLA",
+      "tainted": false,
+      "holdout_integrity": "coder đọc spec.md + bias-testing.md + ADR-012, KHÔNG đọc scenarios/ (chỉ thị + git xác nhận)",
+      "checks": {
+        "R1_CP6_rationale_confirm_advisory": {"score": 95, "evidence": "POST /recommendations 201: rationale≠rỗng ('Dựa trên hồ sơ...'), requires_human_confirmation=true, confirmed_decision=null (=proposed). Cảnh báo non-coercion ('KHÔNG mang tính ép buộc — bạn/giám hộ/giáo viên quyết định') nằm trong rationale tổng (engine.py:292, FR-62)."},
+        "R2_CP6_empty_rationale_rejected": {"score": 95, "evidence": "service.generate guard RationaleRequiredError (service.py:201) + DB Recommendation.rationale nullable=False. Unit+integration test cả hai; không row rationale rỗng."},
+        "R3_CP5_no_auto_apply": {"score": 90, "evidence": "generate → confirmed_by=null, confirmed_decision=null (hệ thống KHÔNG tự quyết). Chỉ 2 endpoint: generate + confirm; confirm bắt buộc decision của người. Không endpoint tự áp dụng."},
+        "R4_CP5_accept_into_pathway": {"score": 80, "evidence": "confirm decision=accepted → confirmed_decision=accepted + confirmed_by set (live ✓). 'Đưa vào lộ trình cá nhân' = bản ghi acceptance trên reco; chưa có entity 'lộ trình cá nhân' riêng (materialization để slice sau)."},
+        "R5_reject": {"score": 88, "evidence": "RecoDecision enum gồm rejected; confirm path đặt confirmed_decision=decision cho mọi giá trị (live verified cho accepted; rejected cùng code path). Suite test mỗi decision value."},
+        "R6_audit_full_trail": {"score": 78, "evidence": "audit_log có recommendation.created + recommendation.confirmed (live ✓); actor_id=confirmed_by. Giá trị decision nằm ở reco row (confirmed_decision) + Gate-B trace, KHÔNG lưu trong audit row → đọc chặt 'decision trong audit_log' chỉ đạt một phần."},
+        "R7_under16_reco_visible_to_guardian": {"score": 50, "evidence": "Guardian-xem-reco-của-trẻ (relational RBAC, CP-4) CHƯA có ở slice-5; reco router chỉ owner (generate+confirm). Thuộc slice counseling/RBAC (counseling-rbac.feature) → G-6, ngoài phạm vi slice-5."}
+      },
+      "formal_gates": {
+        "gate_a_mc": "RecommendationGovernanceMC: 'Model checking completed. No error' (64 distinct states) — CP-5+CP-6 giữ",
+        "gate_a_sab": "RecommendationGovernanceSab: 'Invariant HumanInTheLoop is violated' — gỡ guard con-người bị bắt (teeth)",
+        "gate_b_conformance": "RecommendationTrace: Deadlock @ State 3, l=3 (=Len+1) — tiêu thụ hết [Created→Confirmed], RationaleAlways+HumanInTheLoop giữ mọi state",
+        "gate_b_sabotage": "Confirm-trước-Create: Deadlock @ State 1, l=1 (≠Len+1) — Confirm không enabled (status≠proposed), drift bị bắt",
+        "bias_gate_teeth": "Sabotage inject engine biased thật (đổi top-5 theo gender + ép low-SES rời academic) → M2=0.857/M3=0.767/M4=0.117/M5=0.0 đều FAIL ⇒ suite KHÔNG vacuous (đóng P-1)"
+      },
+      "aggregate": 82.3,
+      "scenarios_below_60": 1,
+      "verdict": "ship (slice-5 scope) — lõi CP-5/CP-6 (R1-R5) 80-95 + Gate A/B PASS với teeth + bias gate non-vacuous. R7 (<60) là guardian-view-child reco = CP-4 relational RBAC, thuộc slice counseling sau, không phải defect slice-5.",
+      "gaps": {
+        "G-6": "OPEN (counseling/RBAC slice): giám hộ/giáo viên xem + tham gia xác nhận reco của trẻ <16 (CP-4 relational ownership). reco hiện owner-only."
+      }
+    },
+    {
       "scope": "slice-4 (career-library.feature)",
       "timestamp": "2026-05-29T15:10:00Z",
       "artifact": "backend/ @ feat/phase4-careers (8250420) — in-process ASGI (real app/DB/auth/seeders)",

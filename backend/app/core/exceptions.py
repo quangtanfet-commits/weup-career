@@ -88,6 +88,18 @@ class SelfConsentError(AppError):
     message = "Không thể tự đóng vai người giám hộ cho chính mình"
 
 
+class RationaleRequiredError(AppError):
+    """CP-6 / [CRED_2FB3E29D]: a recommendation can never be created without a rationale.
+
+    Defence-in-depth alongside the ``Recommendation.rationale`` NOT NULL column:
+    the service raises this before persisting if the rationale is empty.
+    """
+
+    status_code = 422
+    code = "RATIONALE_REQUIRED"
+    message = "Gợi ý bắt buộc phải có lý do (rationale) — không thể tạo gợi ý rỗng lý do"
+
+
 class AssuranceTooLowError(AppError):
     """FF-19: under-16 sensitive data needs a minimum guardian-link assurance."""
 

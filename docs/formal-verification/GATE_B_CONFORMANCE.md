@@ -62,9 +62,23 @@ Instrument `AuthService`: login→`Issue`, refresh→`Rotate`, logout→`Logout`
 
 > ⚠️ **Ranh giới trừu tượng (trung thực):** spec mô hình **MỘT phiên** (`AtMostOneActiveToken` = ≤1 active/user). Impl thực tế **cho ĐA phiên** (login nhiều thiết bị = nhiều refresh token active — đúng thiết kế). Conformance này chứng minh **tính nguyên tử của rotation + revoke trong MỘT phiên** (bản chất an toàn CP-7). Đa-phiên ngoài phạm vi model hiện tại (nâng spec → per-session active set nếu cần). Chống tái dùng token thu hồi đã được holdout A4 phủ (reuse RT cũ → 401).
 
+## Mở rộng slice 5 — CP-5/CP-6 recommendation governance conformance (✅)
+
+Instrument `RecoService`: `generate()`→`RecommendationCreated`, `confirm()`→`RecommendationConfirmed` (env-gated). Spec: `RecommendationTrace.tla` + `RecommendationTraceBase.tla` (bản trace-friendly của `RecommendationGovernance`, RecIds/Humans literal). Trace từ app thật: register(≥16)→submit RIASEC→`POST /recommendations`→`POST /{id}/confirm`; UUID reco/user relabel → r1/u1.
+
+| Run | Trace | Kết quả TLC | Diễn giải |
+|---|---|---|---|
+| **Conformance** | `[RecommendationCreated r1, RecommendationConfirmed r1 by u1=accepted]` (thật) | Deadlock @ State 3, **l=3 (=Len+1)** | ✅ Tiêu thụ hết; `RationaleAlways` (CP-6) + `HumanInTheLoop` (CP-5) giữ ở MỌI state — gợi ý tạo ra luôn có rationale, chỉ thành "accepted" SAU khi con người (u1) xác nhận |
+| **Sabotage** | `[RecommendationConfirmed r1]` (confirm khi chưa create) | Deadlock @ State 1, **l=1 (≠Len+1)** | ✅ `Confirm` không enabled (status≠"proposed") → drift bị bắt; impl không có đường nào confirm một gợi ý chưa tồn tại |
+
+> Gate A song hành: `RecommendationGovernanceMC` = "Model checking completed. No error" (64 distinct states); `RecommendationGovernanceSab` = "Invariant **HumanInTheLoop** is violated" (gỡ guard con-người → bị bắt). CP-5/CP-6 đều non-vacuous ở cả hai gate.
+>
+> Bias (M1–M5) là gate ĐỘC LẬP (`tests/bias/`, Luật 134/2025) — TLC chứng minh *quy trình* human-in-the-loop, KHÔNG chứng minh gợi ý *công bằng*. Sabotage-check bias: inject engine biased thật → M2/M3/M4/M5 đều FAIL ⇒ suite có teeth (đóng P-1).
+
 ## Artifact
-- Harness: `backend/app/core/trace.py` (emit + token_label) + hook ở `backend/app/guardians/service.py`, `backend/app/assessments/service.py`, `backend/app/auth/service.py` (env-gated).
+- Harness: `backend/app/core/trace.py` (emit + token_label; emit loại key `None` để JSON parse được trong TLA) + hook ở `backend/app/guardians/service.py`, `backend/app/assessments/service.py`, `backend/app/auth/service.py`, `backend/app/reco/service.py` (env-gated).
 - Token spec: `tla/trace/AuthTokenTrace.tla`, `AuthTokenTraceBase.tla`, `AuthTokenTrace.cfg`, `token_trace.ndjson`.
+- Reco spec: `tla/trace/RecommendationTrace.tla`, `RecommendationTraceBase.tla`, `RecommendationTrace.cfg`, `recommendation_trace.ndjson`.
 - Spec: `tla/trace/ConsentTrace.tla`, `ConsentTraceBase.tla`, `ConsentTrace.cfg`.
 - Trace: `tla/trace/consent_trace.ndjson`.
 

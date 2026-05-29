@@ -1,6 +1,26 @@
 {
   "runs": [
     {
+      "scope": "slice-8 (account-data-rights.feature)",
+      "timestamp": "2026-05-30T03:30:00Z",
+      "artifact": "backend/ @ feat/slice8-account-data-rights (1e2df4d) — in-process ASGI (real app/DB/crypto/audit) + purge CLI fn",
+      "tainted": false,
+      "holdout_integrity": "coder đọc spec.md + legal + auth-design + ADR, KHÔNG đọc scenarios/ (đặc biệt account-data-rights.feature) — chỉ thị + git xác nhận",
+      "checks": {
+        "DR1_export_personal_data": {"score": 95, "evidence": "GET /me/export 200: keys = profile, assessment_results (GIẢI MÃ), competency_progress, domain_phases, recommendations, subject_id, exported_at; ghi 1 CP-3 audit (is_sensitive_access) + action audit."},
+        "DR2_delete_own_result_fr14": {"score": 95, "evidence": "DELETE /me/assessments/{id} → 204 → GET 404 (verified slice-2 FR-14_delete_own_result); audited."},
+        "DR3_password_requires_current": {"score": 95, "evidence": "POST /me/password current sai → 401 InvalidCredentials; mật khẩu cũ VẪN login (hash không đổi); current đúng → 204, mật khẩu mới login được, token cũ revoked."},
+        "DR4_soft_delete_window_purge": {"score": 95, "evidence": "DELETE /me → account_status=deleted+deleted_at+is_deleted; deleted không login (401). purge_expired_accounts: trong cửa sổ (30d) GIỮ; backdate >40d → purge xóa cứng user + owned data (results=0)."},
+        "DR5_guardian_acts_for_child": {"score": 90, "evidence": "GET /me/children/{kid}/export by verified guardian → 200; unrelated → 404. DELETE /me/children/{id} cùng can_access path, audit actor=guardian (per design + unit test)."},
+        "DR6_all_ops_audited": {"score": 82, "evidence": "Mọi op (export/delete/password/patch) ghi audit row có actor_id + action + created_at(timestamp). 'Lý do' = action string mô tả thao tác (không có field 'reason' riêng biệt)."}
+      },
+      "verify_note": "Static gates sạch (ruff+format+mypy 85 files+bandit). Coverage app/account = 100% (6 files), global 99%. Full suite 368 passed, 0 error (không gặp flake teardown lần này). Không migration (cột User đã có). Login/refresh chặn deleted account. purge cascade owned data explicit per-table (portable SQLite/PG).",
+      "aggregate": 92.0,
+      "scenarios_below_60": 0,
+      "verdict": "ship — data-subject rights FR-91/92 đầy đủ (export/[CRED_C39E5DAB]/password/soft-delete+purge/guardian-proxy), DR1-5 90-95, DR6 82 (audit có actor+time+action; không field reason riêng). Không gap mới.",
+      "gaps": {}
+    },
+    {
       "scope": "slice-7 (wellbeing.feature)",
       "timestamp": "2026-05-30T01:30:00Z",
       "artifact": "backend/ @ feat/slice7-admin-content-wellbeing (01676f4) — in-process ASGI (real app/DB/seeders)",

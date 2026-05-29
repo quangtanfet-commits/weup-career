@@ -28,6 +28,12 @@ from app.core.audit_models import AuditLog
 from app.core.database import Base
 from app.guardians.models import GuardianConsent, GuardianLink
 from app.reco.models import Recommendation
+from app.school.models import (
+    CounselingSession,
+    School,
+    SchoolClass,
+    SchoolMembership,
+)
 
 __all__ = [
     "AssessmentInstrument",
@@ -39,6 +45,7 @@ __all__ = [
     "CareerProfile",
     "Competency",
     "ContentItem",
+    "CounselingSession",
     "GuardianConsent",
     "GuardianLink",
     "Indicator",
@@ -47,5 +54,8 @@ __all__ = [
     "Pathway",
     "Recommendation",
     "RefreshToken",
+    "School",
+    "SchoolClass",
+    "SchoolMembership",
     "User",
 ]

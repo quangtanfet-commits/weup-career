@@ -14,5 +14,8 @@ python -m app.competency.seed
 echo "[entrypoint] seeding career library (idempotent)"
 python -m app.careers.seed
 
+echo "[entrypoint] seeding demo school (idempotent)"
+python -m app.school.seed
+
 echo "[entrypoint] starting: $*"
 exec "$@"

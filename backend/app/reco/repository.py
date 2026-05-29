@@ -2,11 +2,13 @@
 
 Hexagonal (ADR-009): the service depends on the Protocol, not on SQLAlchemy.
 
-Ownership (CP-4): ``get_owned`` filters on ``user_id`` at the data layer, so a
-foreign recommendation is simply not found (→ 404) rather than leaked. The repo
-also exposes read access to the seeded reference data the engine needs
-(``list_careers`` / ``list_pathways``) so the service can build an engine
-profile without importing the careers slice's service.
+Ownership / [CRED_4FFE96A2] (CP-4, G-6): ``get_by_id`` fetches a recommendation by id and
+the *service* applies the relational ``can_access`` decision (owner / [CRED_E96EE5B5]
+guardian / [CRED_3A1FB5BB] counselor) before returning it; a recommendation the actor
+has no relation to surfaces as 404. The repo also exposes read access to the
+seeded reference data the engine needs (``list_careers`` / ``list_pathways``)
+so the service can build an engine profile without importing the careers
+slice's service.
 """
 
 from __future__ import annotations
@@ -24,7 +26,6 @@ from app.reco.models import Recommendation
 
 class IRecoRepo(Protocol):
     async def add(self, reco: Recommendation) -> Recommendation: ...
-    async def get_owned(self, *, reco_id: str, user_id: str) -> Recommendation | None: ...
     async def get_by_id(self, reco_id: str) -> Recommendation | None: ...
     async def list_careers(self) -> list[CareerProfile]: ...
     async def list_pathways(self) -> list[Pathway]: ...
@@ -42,16 +43,6 @@ class SqlRecoRepo:
         self._session.add(reco)
         await self._session.flush()
         return reco
-
-    async def get_owned(self, *, reco_id: str, user_id: str) -> Recommendation | None:
-        """Fetch a recommendation only if owned by ``user_id`` (CP-4)."""
-        result = await self._session.execute(
-            select(Recommendation).where(
-                Recommendation.id == reco_id,
-                Recommendation.user_id == user_id,
-            )
-        )
-        return result.scalars().first()
 
     async def get_by_id(self, reco_id: str) -> Recommendation | None:
         return await self._session.get(Recommendation, reco_id)

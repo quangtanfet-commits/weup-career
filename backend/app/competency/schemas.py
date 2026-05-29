@@ -57,6 +57,20 @@ class RecordIndicatorOut(BaseModel):
     depth_label_vi: str | None
 
 
+class SetDevPhaseRequest(BaseModel):
+    """Set a (possibly deviating) dev_phase for the learner on one area (G-2)."""
+
+    area: CompetencyArea
+    dev_phase: DevPhase
+
+
+class DevPhaseOut(BaseModel):
+    """The recorded dev_phase for an area."""
+
+    area: CompetencyArea
+    dev_phase: DevPhase
+
+
 def depth_label(depth: Depth | None) -> str | None:
     """VI display label for a depth, or ``None`` when no progress yet."""
     return DEPTH_LABEL_VI[depth] if depth is not None else None

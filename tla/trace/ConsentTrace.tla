@@ -28,6 +28,16 @@ TraceRevoke ==
   /\ consent'[logline.user] = logline.state.consent
   /\ l' = l + 1
 
+\* ProcessCareerData (submit trắc nghiệm): chỉ enabled khi CanProcess (consent
+\* active cho <16). Sinh artifact với consentAtCreation = consent hiện tại, khớp
+\* log. Khiến ConsentInvariant (CP-1) trở nên NON-vacuous (artifacts khác rỗng).
+TraceProcess ==
+  /\ IsEvent("ProcessCareerData")
+  /\ ProcessCareerData(logline.user)
+  /\ [owner |-> logline.user,
+      consentAtCreation |-> logline.state.consentAtCreation] \in artifacts'
+  /\ l' = l + 1
+
 TraceInit == Init /\ l = 1
-TraceNext == TraceGrant \/ TraceRevoke
+TraceNext == TraceGrant \/ TraceRevoke \/ TraceProcess
 ==================================================================================

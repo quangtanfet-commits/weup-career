@@ -1,0 +1,2 @@
+{"event":"GrantConsent","user":"c1","state":{"consent":"active"}}
+{"event":"ProcessCareerData","user":"c1","state":{"consentAtCreation":"active"}}

@@ -21,9 +21,22 @@
 
 **Discriminator:** conform ⇔ `l` đạt `Len+1`. Good trace `l→4`; bad trace kẹt `l=2`. Check có răng (không always-green).
 
+## Mở rộng slice 2 — CP-1 artifact conformance (✅ đã đóng caveat)
+
+Slice 2 (assessments) emit thêm event `ProcessCareerData` ở submit → `ConsentInvariant` (CP-1) giờ **NON-vacuous**.
+
+| Run | Trace | Kết quả TLC | Diễn giải |
+|---|---|---|---|
+| **Conformance** | `[GrantConsent, ProcessCareerData]` (thật) | Deadlock @ State 3, **l=3 (=Len+1)** | ✅ Tiêu thụ hết; State 3 `artifacts={[owner|->c1, consentAtCreation|->"active"]}` — **artifacts KHÁC RỖNG**; `ConsentInvariant` được kiểm thật & giữ → impl chỉ tạo artifact khi consent active |
+| **Sabotage** | `[ProcessCareerData]` (chưa Grant, consent=none) | Deadlock @ State 1, **l=1 (≠Len+1)** | ✅ Event không tiêu thụ được (`ProcessCareerData` yêu cầu `CanProcess`=consent active) → drift bị bắt; khớp CP-1 gate (submit 403 khi chưa consent) |
+
+`TraceProcess` trong `ConsentTrace.tla` validate `[owner, consentAtCreation] \in artifacts'`.
+
+> ⚠️ **Giới hạn trung thực:** emit ở submit hardcode `consentAtCreation="active"` (vì submit chỉ tới được sau khi qua CP-1 gate). Negative-case (process khi chưa consent) **được chặn bởi gate**, kiểm riêng bằng holdout CP-1 (403/201) + sabotage trace ở trên — không dựa vào giá trị state trong emit.
+
 ## Ý nghĩa & giới hạn (trung thực)
-- ✅ Chứng minh **máy trạng thái consent của impl khớp ConsentLifecycle** (transition none↔active↔revoked đúng tiền điều kiện CP-1/CP-2). Impl không thực hiện transition nào spec cấm.
-- ⚠️ **CP-1 phần artifact** (`ConsentInvariant` trên dữ liệu hướng nghiệp) **vacuous ở slice 1** vì chưa có route xử lý dữ liệu (`artifacts={}`). Sẽ exercisable ở **slice 2** khi `ProcessCareerData` có route thật (assessments) — lúc đó trace thêm event ProcessCareerData và invariant artifact mới có hiệu lực.
+- ✅ Chứng minh **máy trạng thái consent của impl khớp ConsentLifecycle** (transition none↔active↔revoked + ProcessCareerData đúng tiền điều kiện CP-1/CP-2). Impl không thực hiện transition nào spec cấm.
+- ✅ **CP-1 phần artifact giờ NON-vacuous** (slice 2) — xem mục mở rộng trên.
 - ⚠️ Abstraction map (UUID→c1) là thủ công cho 1 trẻ; mở rộng đa-trẻ ở slice sau.
 - ⏳ **AuthTokenLifecycle (CP-7)** conformance: cùng pattern, làm ở vòng tiếp (login=Issue/refresh=Rotate/logout=Logout). Chưa chạy lần này.
 

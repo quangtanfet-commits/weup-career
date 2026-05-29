@@ -14,6 +14,9 @@ keys start with R/I/A/S/E/C; VIPS with V/I/P/S; MBTI with one of the 8 poles.
 
 from __future__ import annotations
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.enums import InstrumentType
 
 INSTRUMENT_VERSION = "mvp-1"
@@ -62,3 +65,68 @@ ITEMS_BY_TYPE: dict[InstrumentType, dict[str, str]] = {
     InstrumentType.VIPS: VIPS_ITEMS,
     InstrumentType.MBTI: MBTI_ITEMS,
 }
+
+
+async def seed_instruments(session: AsyncSession) -> dict[str, str]:
+    """Idempotently create one active instrument per type (version
+    ``INSTRUMENT_VERSION``) with its items. Returns ``{type_value: instrument_id}``.
+
+    Idempotent: an instrument of the same (type, version) already present is left
+    untouched — re-running is safe (deploy / [CRED_36DC2A53] runs). Closes gap G-1:
+    a fresh DB had no instruments, so submit returned 404. Caller commits.
+    """
+    from app.assessments.models import AssessmentInstrument, AssessmentItem
+    from app.core.models import new_uuid
+
+    ids: dict[str, str] = {}
+    for itype in InstrumentType:
+        existing = (
+            await session.execute(
+                select(AssessmentInstrument).where(
+                    AssessmentInstrument.type == itype,
+                    AssessmentInstrument.version == INSTRUMENT_VERSION,
+                )
+            )
+        ).scalars().first()
+        if existing is not None:
+            ids[itype.value] = existing.id
+            continue
+        inst = AssessmentInstrument(
+            id=new_uuid(), type=itype, version=INSTRUMENT_VERSION, is_active=True
+        )
+        session.add(inst)
+        await session.flush()
+        for key, prompt in ITEMS_BY_TYPE[itype].items():
+            session.add(
+                AssessmentItem(
+                    id=new_uuid(),
+                    instrument_id=inst.id,
+                    item_key=key,
+                    competency_code="NL1",
+                    dieu5_code="b",
+                    prompt_vi=prompt,
+                )
+            )
+        ids[itype.value] = inst.id
+    return ids
+
+
+async def _run() -> None:  # pragma: no cover - CLI entry point
+    """CLI: `python -m app.assessments.seed` — seed instruments into the live DB."""
+    from app.core.config import get_settings
+    from app.core.database import Database
+
+    db = Database(get_settings())
+    try:
+        async with db.session_factory() as session:
+            ids = await seed_instruments(session)
+            await session.commit()
+        print(f"[seed] instruments ready: {sorted(ids)}")
+    finally:
+        await db.dispose()
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entry point
+    import asyncio
+
+    asyncio.run(_run())

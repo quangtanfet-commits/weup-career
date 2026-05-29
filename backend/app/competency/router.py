@@ -21,10 +21,12 @@ from app.api.deps import (
 )
 from app.competency.schemas import (
     CompetencyOut,
+    DevPhaseOut,
     IndicatorOut,
     ProgressItemOut,
     RecordIndicatorOut,
     RecordIndicatorRequest,
+    SetDevPhaseRequest,
     depth_label,
 )
 from app.competency.service import CompetencyService
@@ -102,3 +104,24 @@ async def record_indicator(
         depth_achieved=outcome.depth_achieved,
         depth_label_vi=depth_label(outcome.depth_achieved),
     )
+
+
+@router.post(
+    "/me/progress/dev-phase",
+    response_model=DevPhaseOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def set_dev_phase(
+    payload: SetDevPhaseRequest,
+    current: CurrentUser = Depends(require_career_data_consent),
+    service: CompetencyService = Depends(competency_service),
+) -> DevPhaseOut:
+    """Set a (possibly deviating) dev_phase for one area (G-2; FR-23).
+
+    Career-data write → consent-gated (CP-1/CP-2). Students may deviate from the
+    school_level-inferred default; working users accumulate one phase per area.
+    """
+    row = await service.set_domain_phase(
+        user_id=current.id, area=payload.area, dev_phase=payload.dev_phase
+    )
+    return DevPhaseOut(area=row.area, dev_phase=row.dev_phase)

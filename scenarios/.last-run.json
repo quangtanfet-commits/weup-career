@@ -12,13 +12,13 @@
         "S3_CP8_no_regress": {"score": 90, "evidence": "NL1: record R rồi K → depth giữ R, advanced=false (CP-8 ✓). Lưu ý: impl chỉ ghi row khi ADVANCE (lần K không tiến → không tạo row); row R không bị sửa/xóa (append-only ✓). Scenario giả định log mọi lần thử = over-spec, không phải lỗi."},
         "S4_THCS_default_exploration": {"score": 100, "evidence": "lower_secondary → /me/progress dev_phase=exploration"},
         "S6_VI_depth_labels": {"score": 100, "evidence": "indicators có nhãn Nhận biết/Thực hiện-Vận dụng/Phản tư"},
-        "S5_working_multi_phase": {"score": 70, "evidence": "Read OK: chèn LearnerDomainPhase (A=planning, B=awareness) → /me/progress phản ánh đa-phase. ⚠ GAP G-2: set_domain_phase CHƯA có endpoint API (chỉ service-layer) → không set được dev_phase qua sản phẩm."}
+        "S5_working_multi_phase": {"score": 95, "evidence": "✅ G-2 CLOSED: endpoint POST /me/progress/dev-phase (consent-gated). Working set A=planning + B=awareness qua API → /me/progress phản ánh đa-phase; S4-deviation cũng đạt. Test: tests/integration/test_competency_devphase.py (4 ca)."}
       },
-      "aggregate": 93.3,
+      "aggregate": 98.3,
       "scenarios_below_60": 0,
-      "verdict": "ship core (CP-8 + tree verified); G-2 = thiếu endpoint set dev_phase (slice sau)",
+      "verdict": "ship — G-2 đã đóng (endpoint set dev_phase)",
       "gaps": {
-        "G-2": "set_domain_phase có ở service nhưng chưa expose route (ngoài API §6). Cần endpoint POST ghi dev_phase để S5 (đa-phase working) + S4-deviation đạt qua API."
+        "G-2": "CLOSED: thêm POST /me/progress/dev-phase (consent-gated, set/deviate dev_phase per area). 4 test; spec §6 cập nhật."
       }
     },
     {

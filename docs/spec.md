@@ -212,7 +212,9 @@ Base: `/api/v1/...`
 | POST | /guardians/consent | Guardian cấp đồng ý | Bearer |
 | POST | /guardians/consent/revoke | Guardian thu hồi | Bearer |
 | GET | /competencies | Cây 12 năng lực + indicator | Bearer |
-| GET | /me/progress | Tiến bộ K-A-R per năng lực | Bearer |
+| GET | /me/progress | Tiến bộ K-A-R per năng lực | Bearer + consent |
+| POST | /me/progress/indicators | Ghi đạt indicator (tiến K→A→R, CP-8) | Bearer + consent |
+| POST | /me/progress/dev-phase | Đặt dev_phase theo lĩnh vực (lệch/đa-phase, FR-23) | Bearer + consent |
 | GET | /assessments | Danh sách instrument (RIASEC/VIPS/MBTI) | Bearer |
 | POST | /assessments/{type}/submit | Nộp bài → kết quả (nhạy cảm) | Bearer + consent |
 | GET | /me/assessments/{id} | Xem kết quả (audit-logged) | Bearer + consent |

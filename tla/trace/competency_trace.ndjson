@@ -1,0 +1,3 @@
+{"event":"AdvanceDepth","user":"l1","state":{"competency":"c1","depth":1}}
+{"event":"AdvanceDepth","user":"l1","state":{"competency":"c1","depth":2}}
+{"event":"AdvanceDepth","user":"l1","state":{"competency":"c1","depth":3}}

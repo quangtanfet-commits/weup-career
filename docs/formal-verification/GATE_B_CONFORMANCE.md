@@ -34,6 +34,17 @@ Slice 2 (assessments) emit thêm event `ProcessCareerData` ở submit → `Conse
 
 > ⚠️ **Giới hạn trung thực:** emit ở submit hardcode `consentAtCreation="active"` (vì submit chỉ tới được sau khi qua CP-1 gate). Negative-case (process khi chưa consent) **được chặn bởi gate**, kiểm riêng bằng holdout CP-1 (403/201) + sabotage trace ở trên — không dựa vào giá trị state trong emit.
 
+## Mở rộng slice 3 — CP-8 competency progress conformance (✅)
+
+Slice 3 emit `AdvanceDepth {competency, depth(rank)}` khi nâng độ sâu. Spec: `CompetencyProgressTrace.tla` + `CompetencyProgressTraceBase.tla` (`Advance` chỉ enabled khi rank mới > hiện tại).
+
+| Run | Trace | Kết quả TLC | Diễn giải |
+|---|---|---|---|
+| **Conformance** | `[AdvanceDepth 1, 2, 3]` cho (l1,c1) (thật, NL10 K→A→R) | Deadlock @ State 4, **l=4 (=Len+1)** | ✅ Tiêu thụ hết; depth 0→1→2→3, **mỗi bước tăng ngặt** → CP-8 monotonic giữ trên impl |
+| **Sabotage** | `[AdvanceDepth 3, AdvanceDepth 1]` (giảm) | Deadlock @ State 2, **l=2 (≠Len+1)** | ✅ Bước giảm không enabled (1 không > 3) → drift bị bắt |
+
+> Nhất quán với holdout S3: impl chỉ emit `AdvanceDepth` (và chỉ ghi `learner_progress`) khi độ sâu THỰC SỰ tiến; lần không tiến → không sự kiện, không drift. CP-8 (monotonic + append-only) giữ.
+
 ## Ý nghĩa & giới hạn (trung thực)
 - ✅ Chứng minh **máy trạng thái consent của impl khớp ConsentLifecycle** (transition none↔active↔revoked + ProcessCareerData đúng tiền điều kiện CP-1/CP-2). Impl không thực hiện transition nào spec cấm.
 - ✅ **CP-1 phần artifact giờ NON-vacuous** (slice 2) — xem mục mở rộng trên.

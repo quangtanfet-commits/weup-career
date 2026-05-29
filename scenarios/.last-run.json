@@ -1,6 +1,27 @@
 {
   "runs": [
     {
+      "scope": "slice-3 (competency-progress.feature)",
+      "timestamp": "2026-05-29T13:30:00Z",
+      "artifact": "backend/ @ feat/phase3-competency — in-process ASGI (real app/DB/guard)",
+      "tainted": false,
+      "holdout_integrity": "coder không truy cập scenarios/ (chỉ thị + git)",
+      "checks": {
+        "S1_tree_12_3areas_dieu5": {"score": 100, "evidence": "GET /competencies = 12 (NL1..NL12), 3 area A/B/C, dieu5_codes có"},
+        "S2_K_to_A_history_kept": {"score": 100, "evidence": "NL10: record K→A → depth=A; 2 learner_progress rows (cả K lẫn A)"},
+        "S3_CP8_no_regress": {"score": 90, "evidence": "NL1: record R rồi K → depth giữ R, advanced=false (CP-8 ✓). Lưu ý: impl chỉ ghi row khi ADVANCE (lần K không tiến → không tạo row); row R không bị sửa/xóa (append-only ✓). Scenario giả định log mọi lần thử = over-spec, không phải lỗi."},
+        "S4_THCS_default_exploration": {"score": 100, "evidence": "lower_secondary → /me/progress dev_phase=exploration"},
+        "S6_VI_depth_labels": {"score": 100, "evidence": "indicators có nhãn Nhận biết/Thực hiện-Vận dụng/Phản tư"},
+        "S5_working_multi_phase": {"score": 70, "evidence": "Read OK: chèn LearnerDomainPhase (A=planning, B=awareness) → /me/progress phản ánh đa-phase. ⚠ GAP G-2: set_domain_phase CHƯA có endpoint API (chỉ service-layer) → không set được dev_phase qua sản phẩm."}
+      },
+      "aggregate": 93.3,
+      "scenarios_below_60": 0,
+      "verdict": "ship core (CP-8 + tree verified); G-2 = thiếu endpoint set dev_phase (slice sau)",
+      "gaps": {
+        "G-2": "set_domain_phase có ở service nhưng chưa expose route (ngoài API §6). Cần endpoint POST ghi dev_phase để S5 (đa-phase working) + S4-deviation đạt qua API."
+      }
+    },
+    {
       "scope": "slice-1 (auth + guardian consent)",
       "timestamp": "2026-05-29T10:30:00Z",
       "verdict": "ship (slice-1 scope)",

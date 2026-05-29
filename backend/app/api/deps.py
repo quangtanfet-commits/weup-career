@@ -16,6 +16,8 @@ from app.assessments.repository import SqlAssessmentRepo
 from app.assessments.service import AssessmentService
 from app.auth.repository import SqlRefreshTokenRepo, SqlUserRepo
 from app.auth.service import AuthService
+from app.competency.repository import SqlCompetencyRepo
+from app.competency.service import CompetencyService
 from app.core.audit import SqlAuditRepo
 from app.core.config import Settings, get_settings
 from app.core.consent import require_consent
@@ -82,6 +84,10 @@ def assessment_repo(session: AsyncSession = Depends(get_session)) -> SqlAssessme
     return SqlAssessmentRepo(session)
 
 
+def competency_repo(session: AsyncSession = Depends(get_session)) -> SqlCompetencyRepo:
+    return SqlCompetencyRepo(session)
+
+
 def field_crypto(settings: Settings = Depends(settings_dep)) -> FieldCrypto:
     return FieldCrypto(settings.field_encryption_key)
 
@@ -120,6 +126,14 @@ def assessment_service(
         audit=audit,
         crypto=crypto,
     )
+
+
+def competency_service(
+    competencies: SqlCompetencyRepo = Depends(competency_repo),
+    users: SqlUserRepo = Depends(user_repo),
+    audit: SqlAuditRepo = Depends(audit_repo),
+) -> CompetencyService:
+    return CompetencyService(competencies=competencies, users=users, audit=audit)
 
 
 # -- auth dependencies ----------------------------------------------------

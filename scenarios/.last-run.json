@@ -1,6 +1,34 @@
 {
   "runs": [
     {
+      "scope": "slice-6 (counseling-rbac.feature)",
+      "timestamp": "2026-05-29T23:30:00Z",
+      "artifact": "backend/ @ feat/slice6-school-counseling (0fddde9 + format fix) — in-process ASGI (real app/DB/authz/audit/crypto) + Gate A TLA",
+      "tainted": false,
+      "holdout_integrity": "coder đọc spec.md + auth-design.md + ADR, KHÔNG đọc scenarios/ (chỉ thị + git xác nhận)",
+      "checks": {
+        "CS1_counselor_sees_own_school": {"score": 95, "evidence": "GET /school/{S1}/students by counselor S1 → 200, roster chứa học sinh H (has_student=true)."},
+        "CS2_no_cross_school_access": {"score": 88, "evidence": "Counselor S2 → GET /school/{S1}/students = 404 (chặn đúng). Lệch: scenario ghi 403, impl trả 404 (existence-hiding theo auth-design.md — không lộ tồn tại; an toàn hơn). Substance đạt, status code khác."},
+        "CS3_desensitized_plus_cp3_audit": {"score": 95, "evidence": "Counselor read GET /school/students/{H}/progress = 200: có competency progress + summary_code (Holland/MBTI), KHÔNG lộ result_payload/scores/ciphertext 'v1:' (leaks_raw_payload=false). Đúng 1 audit row is_sensitive_access=True (counselor+student), fail-closed."},
+        "CS4_tier3_session": {"score": 95, "evidence": "POST /counseling/sessions {student_id=H, tier='3'} by counselor S1 → 201; counselor S2 (cross-school) → 404 (CP-4)."},
+        "CS5_school_admin_manage": {"score": 45, "evidence": "school_admin role + scope theo school_id CÓ, nhưng KHÔNG có admin write-endpoint (tạo lớp / gán học sinh) — enrollment hiện qua seed/test-helper. Quản lý CRUD chưa build → G-7. Dưới floor."},
+        "CS6_guardian_only_verified_child": {"score": 82, "evidence": "Quan hệ trái phép → 404 (proven: unrelated read reco 404). read_student_progress dùng can_access (path guardian tái dùng) nên guardian verified xem được progress trẻ qua /school/students/{id}/progress; path '/users/{id}/progress' của scenario khác tên (chức năng có, route đặt khác)."}
+      },
+      "formal_gates": {
+        "gate_a_mc": "AuthorizationModelMC (CP-4): 'Model checking completed. No error' (128 distinct states) — OwnershipInvariant giữ",
+        "gate_a_sab": "AuthorizationModelSab: 'Invariant OwnershipInvariant is violated' — cấp quyền cross-relation bị bắt (teeth)",
+        "gate_b_cp4": "CP-4 là predicate phân quyền (truy vấn quan hệ), không phải máy trạng thái thời gian — conformance phủ bởi integration live (counselor cùng/khác trường, class-scope) + G-6 confirm-by-guardian dùng RecommendationConfirmed trace. Không cần trace harness thời gian riêng.",
+        "g6_relational_confirm": "Live: guardian verified đọc reco trẻ (200) + confirm → confirmed_by=guardian_id, decision=accepted; unrelated read/confirm → 404. CP-5 giữ (người thật confirm, không phải hệ thống); CP-6 không đổi."
+      },
+      "aggregate": 83.3,
+      "scenarios_below_60": 1,
+      "verdict": "ship (slice-6 RBAC scope) — lõi CP-4 (CS1-CS4,CS6) 82-95 + Gate A PASS với teeth + G-6 đóng (live). CS5 (<60) = thiếu admin write-CRUD (class/student management), không phải defect RBAC core → G-7.",
+      "gaps": {
+        "G-6": "CLOSED: giám hộ verified xem + xác nhận reco của trẻ (can_access-gated; confirmed_by=người thật). Test: test_reco_g6_relational.py.",
+        "G-7": "OPEN (admin CRUD slice/endpoint): school_admin tạo lớp + gán học sinh/counselor qua API (hiện qua seed/test-helper). Role+scope đã có; thiếu route quản trị."
+      }
+    },
+    {
       "scope": "slice-5 (recommendation.feature)",
       "timestamp": "2026-05-29T21:45:00Z",
       "artifact": "backend/ @ feat/slice5-reco-engine (767788f) — in-process ASGI (real app/DB/auth/consent/audit) + Gate A/B TLA",

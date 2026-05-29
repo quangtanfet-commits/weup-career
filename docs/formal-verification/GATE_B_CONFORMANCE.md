@@ -75,6 +75,12 @@ Instrument `RecoService`: `generate()`→`RecommendationCreated`, `confirm()`→
 >
 > Bias (M1–M5) là gate ĐỘC LẬP (`tests/bias/`, Luật 134/2025) — TLC chứng minh *quy trình* human-in-the-loop, KHÔNG chứng minh gợi ý *công bằng*. Sabotage-check bias: inject engine biased thật → M2/M3/M4/M5 đều FAIL ⇒ suite có teeth (đóng P-1).
 
+## Mở rộng slice 6 — CP-4 relational RBAC (Gate A + integration)
+
+CP-4 (counselor↔student, guardian↔child ownership) là **predicate phân quyền** (truy vấn quan hệ tại từng request), KHÔNG phải máy trạng thái thời gian như consent/token/reco. Vì vậy:
+- **Gate A** — `AuthorizationModelMC`: "Model checking completed. No error" (128 distinct states, `OwnershipInvariant` giữ). `AuthorizationModelSab`: "Invariant **OwnershipInvariant** is violated" (cấp quyền cross-relation → bị bắt; teeth).
+- **Conformance** phủ bởi integration trên app thật (không cần trace harness thời gian): counselor cùng trường đọc được học sinh được phân công; **khác trường → 404**; class-scope; counselor đọc dữ liệu nhạy cảm → **de-sensitized** (không payload thô) + **1 CP-3 audit**; **G-6** giám hộ verified xem + confirm reco của trẻ (confirmed_by=người thật, unrelated→404) — tái dùng `RecommendationConfirmed` trace của Gate B slice 5.
+
 ## Artifact
 - Harness: `backend/app/core/trace.py` (emit + token_label; emit loại key `None` để JSON parse được trong TLA) + hook ở `backend/app/guardians/service.py`, `backend/app/assessments/service.py`, `backend/app/auth/service.py`, `backend/app/reco/service.py` (env-gated).
 - Token spec: `tla/trace/AuthTokenTrace.tla`, `AuthTokenTraceBase.tla`, `AuthTokenTrace.cfg`, `token_trace.ndjson`.

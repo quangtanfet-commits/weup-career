@@ -8,8 +8,8 @@
 ## Context
 
 The frontend SPA has two categories of state:
-1. **Server state**: todo data, tags, user profile (lives on the server, needs caching, background refresh, optimistic updates)
-2. **Client state**: auth tokens, UI preferences, pending drag operations (local only)
+1. **Server state**: kết quả trắc nghiệm, cây năng lực & tiến bộ, thư viện nghề, gợi ý, hồ sơ (cache, refresh nền, optimistic — **trừ dữ liệu nhạy cảm & gợi ý phân luồng**)
+2. **Client state**: auth tokens, UI preferences (local only)
 
 These have fundamentally different lifecycles and should be managed differently.
 
@@ -80,15 +80,17 @@ Auth Store (Zustand + persist)
 
 UI Store (Zustand)
   - sidebarOpen: boolean
-  - activeFilters: FilterState
-  - pendingReorder: TodoItem[] | null  ← optimistic drag state
+  - activeCareerFilters: FilterState
 
 Server State (TanStack Query)
-  - ['todos', filters]               ← todo list cache
-  - ['todos', id]                    ← single todo cache
-  - ['tags']                         ← tag list cache
-  - ['user', 'me']                   ← profile cache
+  - ['careers', filters]             ← thư viện nghề (cache công khai, OK)
+  - ['competency', 'tree']           ← cây 12 năng lực (gần tĩnh)
+  - ['me', 'progress']               ← tiến bộ K-A-R
+  - ['user', 'me']                   ← profile
+  - KHÔNG cache lâu: ['me','assessments',id] (nhạy cảm), ['recommendations'] (cần xác nhận người)
 ```
+
+> **Ràng buộc nhạy cảm:** kết quả trắc nghiệm không lưu localStorage, không cache dài; gợi ý phân luồng **không** optimistic (chỉ hiển thị sau khi server tạo kèm rationale, có hiệu lực sau xác nhận người — CP-5).
 
 ### Why access_token is NOT in localStorage
 

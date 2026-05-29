@@ -1,258 +1,198 @@
-# UX Design: User Flows
+# Thiết kế UX: Luồng Người dùng — WeUp Career
 
-**Version:** 1.0.0 | **Date:** 2026-05-27  
-**Design Philosophy:** Eliminate friction. Every interaction should feel instant.
-
----
-
-## Design Principles
-
-These are non-negotiable product constraints, not suggestions:
-
-1. **Zero friction for the primary action**: Creating a todo should take exactly one click + typing + Enter. No modal required.
-2. **Instant feedback**: Every action has an immediate visual response (optimistic update or loading state). No request should feel slow.
-3. **Safe to be wrong**: Destructive actions (delete) are reversible within 5 seconds. No confirmation dialog — just instant action + undo.
-4. **Progressive disclosure**: Advanced features (due date, priority, tags) are accessible but not in the way.
-5. **Keyboard-first**: Power users should never need to reach for the mouse.
-6. **No visual noise**: Minimal UI. Plenty of whitespace. Task content is the hero.
+**Phiên bản:** 2.0.0 | **Ngày:** 2026-05-29
+**Triết lý:** Rõ ràng, an toàn, tôn trọng quyền tự quyết. Hướng nghiệp là **đồng hành**, không phán xử.
+**Thay thế:** v1.0.0 (UX Todo app)
 
 ---
 
-## User Flow 1: Onboarding (First-Time User)
+## Nguyên tắc thiết kế (ràng buộc sản phẩm, không phải gợi ý)
+
+1. **An toàn & hợp pháp trước tiên:** trẻ <16 không vào được nội dung hướng nghiệp đến khi có **đồng ý giám hộ** — và điều này được giải thích rõ ràng, không gây hoang mang.
+2. **Không ép buộc:** mọi gợi ý ngành/nghề/phân luồng đều **kèm lý do** và nhấn mạnh "quyết định thuộc về bạn / giám hộ / giáo viên" (TT 16/2026, Luật 134/2025).
+3. **Tôn trọng riêng tư:** kết quả trắc nghiệm là **nhạy cảm** — luôn có chỉ dẫn về ai xem được, và lối tắt **xuất/xóa** dữ liệu của mình.
+4. **Phù hợp lứa tuổi:** ngôn ngữ & độ phức tạp phân tầng theo `school_level` (Tiểu học → người đi làm).
+5. **Phản hồi tức thì** cho thao tác không nhạy cảm (điều hướng, lọc nghề); **không** optimistic cho gợi ý phân luồng.
+6. **Keyboard-first & WCAG 2.1 AA** xuyên suốt.
+
+---
+
+## Luồng 1: Onboarding + Cổng tuổi & Đồng ý giám hộ
 
 ```mermaid
 flowchart TD
-    START([User opens app]) --> LOGIN_PAGE["/login page\nClean, centered card\nEmail + Password fields\nLogin button\nLink: 'Create account'"]
-    
-    LOGIN_PAGE --> NEW_USER{New user?}
-    
-    NEW_USER -->|Yes| REGISTER_LINK["Click 'Create account'"]
-    REGISTER_LINK --> REGISTER_PAGE["/register page\nEmail + Password fields\nPassword strength indicator\nCreate account button"]
-    REGISTER_PAGE --> VALIDATE["Real-time validation\nas user types\n(Zod + react-hook-form)"]
-    VALIDATE --> SUBMIT_REG["Submit form"]
-    SUBMIT_REG --> AUTO_LOGIN["Auto-login on success\nNo extra step"]
-    AUTO_LOGIN --> EMPTY_STATE["Main todos page\nEmpty state illustration\nCTA: 'Add your first task'"]
-    
-    NEW_USER -->|No| FILL_LOGIN["Enter credentials"]
-    FILL_LOGIN --> SUBMIT_LOGIN["Click Login / Press Enter"]
-    SUBMIT_LOGIN --> TODOS_PAGE["Main todos page"]
-    SUBMIT_LOGIN --> LOGIN_ERROR["Inline error message\n'Invalid email or password'\n(generic — no enumeration)"]
-    
-    EMPTY_STATE --> FIRST_TODO["Click CTA → Focus input"]
+    START([Mở app]) --> LOGIN["/login\nEmail + Password\nLink: 'Tạo tài khoản'"]
+    LOGIN --> NEW{Người mới?}
+    NEW -->|Có| REG["/register\nEmail + Password + Ngày sinh\n(password strength)"]
+    REG --> AGE{age_band?}
+    AGE -->|"≥16"| ACTIVE["account=active\n→ Dashboard hướng nghiệp"]
+    AGE -->|"<16"| GATE["account=pending_guardian_consent\nMàn hình thân thiện:\n'Cần người thân đồng ý để bắt đầu'"]
+    GATE --> INVITE["Nhập email/SĐT người giám hộ\n→ gửi lời mời"]
+    INVITE --> WAIT["Trạng thái chờ\n(có thể khám phá nội dung CÔNG KHAI:\nthư viện nghề — không cần dữ liệu cá nhân)"]
+    WAIT --> CONSENT["Giám hộ xác nhận (email/VNeID)"]
+    CONSENT --> UNLOCK["account=active\n→ mở khóa trắc nghiệm & gợi ý"]
+    NEW -->|Không| FILL["Đăng nhập"]
+    FILL --> ROUTE{account_status}
+    ROUTE -->|active| DASH["Dashboard"]
+    ROUTE -->|pending| GATE
+    FILL --> ERR["Lỗi inline: 'Email hoặc mật khẩu không đúng' (generic)"]
 ```
+
+> Trẻ <16 **vẫn xem được nội dung công khai** (thư viện nghề) khi chờ consent — chỉ phần xử lý dữ liệu cá nhân (trắc nghiệm/gợi ý) bị khóa. Tránh cảm giác "bị chặn cụt".
 
 ---
 
-## User Flow 2: Creating a Todo (Primary Action)
+## Luồng 2: Làm trắc nghiệm định hướng (RIASEC / VIPS / MBTI)
 
 ```mermaid
 flowchart TD
-    MAIN[Main Page] --> CLICK["Click 'Add task' button\nor press 'N' keyboard shortcut"]
-    CLICK --> INLINE_INPUT["Inline input appears\nat top of list\n(no modal)\nAuto-focused"]
-    INLINE_INPUT --> TITLE["User types title\n'Buy groceries'"]
-    TITLE --> ENTER["Press Enter"]
-    ENTER --> OPTIMISTIC["Todo appears instantly\n(optimistic update)\nwith loading indicator"]
-    OPTIMISTIC --> SERVER["API call in background"]
-    SERVER --> SUCCESS["Loading indicator fades\nReal todo confirmed"]
-    
-    TITLE --> EXPAND["Click expand icon\nor press Tab"]
-    EXPAND --> RICH_FORM["Expanded inline form\n+ Description textarea\n+ Due date picker\n+ Priority selector (Low/Med/High)\n+ Tag multi-select"]
-    RICH_FORM --> SAVE["Click Save or Ctrl+Enter"]
-    SAVE --> OPTIMISTIC
-    
-    ENTER --> ESC["User presses Esc"]
-    ESC --> CANCEL["Input closes\nNo todo created"]
+    DASH[Dashboard] --> PICK["Chọn bộ test:\nRIASEC · VIPS · MBTI"]
+    PICK --> GATE{consent OK?}
+    GATE -->|"<16 chưa consent"| BLOCK["Màn hình: cần đồng ý giám hộ\n(nút gửi lại lời mời)"]
+    GATE -->|OK| INTRO["Giới thiệu: mục đích, ~thời lượng,\nlưu ý 'kết quả là để hiểu bản thân, không phán xử'"]
+    INTRO --> DOING["Làm bài (progress bar, lưu nháp)"]
+    DOING --> SUBMIT["Nộp bài"]
+    SUBMIT --> RESULT["Kết quả + GIẢI THÍCH\n• nhóm RIASEC nổi trội\n• liên hệ nhóm nghề (gợi mở, không chốt 1 nghề)\n• badge 'Dữ liệu riêng tư của bạn'"]
+    RESULT --> ACTIONS["Hành động: Xem nghề liên quan ·\nLưu vào hồ sơ · Xuất · Xóa"]
+    RESULT --> SENS["Chỉ dẫn quyền riêng tư:\n'Ai xem được kết quả này?'\n(bạn; giám hộ nếu <16; counselor nếu bạn cho phép)"]
 ```
 
 ---
 
-## User Flow 3: Managing Todos
+## Luồng 3: Khám phá thư viện nghề (Điều 5a)
 
 ```mermaid
 flowchart TD
-    LIST["Todo List View"] --> HOVER["Hover a todo item"]
-    HOVER --> ACTIONS["Reveal action icons:\n✓ Complete | ✏️ Edit | 🗑️ Delete"]
-    
-    ACTIONS --> COMPLETE["Click ✓ (Complete)"]
-    COMPLETE --> DONE_STYLE["Item gets strikethrough\nStatus badge: Done\nMoves to bottom (configurable)"]
-    
-    ACTIONS --> EDIT["Click ✏️ (Edit)"]
-    EDIT --> INLINE_EDIT["Title becomes editable\ninline text field\n(no modal)"]
-    INLINE_EDIT --> SAVE_EDIT["Press Enter or click away"]
-    SAVE_EDIT --> OPTIMISTIC_UPDATE["Instant optimistic update"]
-    
-    ACTIONS --> DELETE["Click 🗑️ (Delete)"]
-    DELETE --> REMOVE_INSTANT["Item removed instantly\nfrom list\n(optimistic)"]
-    REMOVE_INSTANT --> UNDO_TOAST["Toast notification appears:\n'Task deleted  [Undo]'\n5-second countdown"]
-    UNDO_TOAST --> UNDO_CLICK["User clicks Undo"]
-    UNDO_CLICK --> RESTORE["Item restored to list\nin original position"]
-    UNDO_TOAST --> TIMER_EXPIRE["5 seconds pass\nToast dismisses\nSoft delete committed"]
+    LIB["Thư viện nghề"] --> FILTER["Lọc: nhóm RIASEC · lĩnh vực · trình độ đào tạo\n(THPT/GDNN/trường trung học nghề/ĐH)"]
+    FILTER --> RESULT["Danh sách nghề (tức thì, cache công khai)"]
+    RESULT --> DETAIL["Chi tiết nghề:\nmô tả · năng lực & phẩm chất cần\nđiều kiện đào tạo · cơ hội việc làm · xu hướng"]
+    DETAIL --> LINK["Liên kết: 'Nghề này hợp với hồ sơ của bạn?'\n→ đối chiếu kết quả test (nếu có)"]
+    DETAIL --> RELATED["Nghề liên quan · con đường học tập"]
 ```
 
 ---
 
-## User Flow 4: Filtering and Search
+## Luồng 4: Bảng tiến bộ năng lực (2 trục K-A-R × giai đoạn)
 
 ```mermaid
 flowchart TD
-    MAIN_VIEW["Main Todo View\n(Filter bar at top)"]
-    
-    MAIN_VIEW --> SEARCH["Type in search box\n(debounced 300ms)\n'grocery'"]
-    SEARCH --> FILTERED["List narrows in real-time\nMatching text highlighted"]
-    
-    MAIN_VIEW --> STATUS_FILTER["Click status pills:\n[All] [Open] [In Progress] [Done]"]
-    STATUS_FILTER --> STATUS_RESULT["List updates instantly\nfrom TanStack Query cache\n(no loading state for cached filters)"]
-    
-    MAIN_VIEW --> TAG_FILTER["Click tag name(s)\nin filter bar"]
-    TAG_FILTER --> TAG_RESULT["Multi-select: AND logic\nList shows todos\nmatching ALL selected tags"]
-    
-    MAIN_VIEW --> PRIORITY_SORT["Click column header\nor sort dropdown:\n'Sort by: Priority'"]
-    PRIORITY_SORT --> SORTED["List re-sorted\nHigh → Medium → Low"]
-    
-    MAIN_VIEW --> RESET["'Clear filters' link\n(appears when any filter active)"]
-    RESET --> FULL_LIST["Full list restored"]
+    PROG["Dashboard tiến bộ"] --> TREE["Cây 12 năng lực (3 lĩnh vực ABCD)"]
+    TREE --> CELL["Mỗi năng lực hiển thị:\n• giai đoạn phát triển (Awareness/Exploration/Planning)\n• độ sâu đạt được (K → A → R)"]
+    CELL --> DETAIL["Chi tiết năng lực:\nchỉ báo đã đạt · hoạt động gợi ý để tiến mức"]
+    PROG --> PHASE["Thanh giai đoạn theo cấp lớp\n(học sinh: gắn school_level;\nngười đi làm: nhiều giai đoạn song song)"]
 ```
+
+> Trục độ sâu hiển thị theo ngôn ngữ VN: **Nhận biết → Thực hiện/Vận dụng → Phản tư** (khớp CTGDPT 2018).
 
 ---
 
-## User Flow 5: Drag-and-Drop Reorder
+## Luồng 5: Xem gợi ý nghề/lộ trình (Human-in-the-loop)
 
 ```mermaid
 flowchart TD
-    LIST["Sorted Todo List"] --> GRAB["User grabs handle icon\n(⠿ drag handle, left side)\non mouse down"]
-    GRAB --> DRAG["Item lifts slightly\nShadow effect\n(Framer Motion)"]
-    DRAG --> MOVE["User drags up/down\nOther items shift\nto show insertion point"]
-    MOVE --> DROP["User releases\n(drop)"]
-    DROP --> REORDER_INSTANT["List rearranges instantly\n(local state, optimistic)"]
-    REORDER_INSTANT --> API_CALL["POST /api/v1/todos/reorder\n[{id, sort_order}...]"]
-    API_CALL --> CONFIRM["Confirmed by server\n(silent, no UI change needed)"]
-    API_CALL --> FAIL["Network error\nList reverts to\npre-drag order\nError toast shown"]
+    REQ["Yêu cầu gợi ý lộ trình"] --> CARD["Thẻ gợi ý:\n• đề xuất ngành/nghề/hướng phân luồng\n• ⭐ LÝ DO (dựa trên test + tiến bộ + sở thích)\n• nhãn: 'Đây là gợi ý — quyết định thuộc về bạn'"]
+    CARD --> CHOICE{"Người xem quyết định"}
+    CHOICE -->|Chấp nhận| ACCEPT["Đưa vào lộ trình cá nhân\n(ghi confirmed_by)"]
+    CHOICE -->|Từ chối| REJECT["Ẩn; có thể yêu cầu gợi ý khác"]
+    CHOICE -->|Để sau| DEFER["Lưu lại xem sau"]
+    CARD --> WHO["Nếu <16: gợi ý cũng hiển thị cho giám hộ\nNếu trong trường: có thể chia sẻ với counselor"]
+```
+
+> ⛔ Không có nút "tự động áp dụng". Hệ thống **không** chuyển gợi ý thành lộ trình khi chưa có người xác nhận (CP-5).
+
+---
+
+## Luồng 6: Counselor — tư vấn 3 tầng
+
+```mermaid
+flowchart TD
+    CONSOLE["Bảng counselor (theo trường)"] --> LIST["DS học sinh được phân công\n(chỉ trong school_id của mình)"]
+    LIST --> VIEW["Xem tiến bộ năng lực (đã gỡ chi tiết nhạy cảm theo quyền)"]
+    VIEW --> TIER{"Mức hỗ trợ"}
+    TIER -->|Tier 1| MASS["Nội dung đại trà / lớp"]
+    TIER -->|Tier 2| GROUP["Hoạt động nhóm mục tiêu"]
+    TIER -->|Tier 3| INDIV["Phiên tư vấn cá nhân\n(ghi CounselingSession)"]
+    INDIV --> WELLBEING["Liên kết module sức khỏe tinh thần (NL4)\nkhi học sinh có dấu hiệu cần hỗ trợ"]
 ```
 
 ---
 
-## Page Layouts
+## Bố cục trang
 
-### Login / Register Page
-
+### Trang Đăng nhập / Đăng ký
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│                     ✓ Todos                                 │
-│                   (logo, centered)                          │
-│                                                             │
-│              ┌──────────────────────────┐                  │
-│              │  Welcome back             │                  │
-│              │                          │                  │
-│              │  Email                   │                  │
-│              │  ┌──────────────────┐   │                  │
-│              │  │ user@example.com  │   │                  │
-│              │  └──────────────────┘   │                  │
-│              │                          │                  │
-│              │  Password                │                  │
-│              │  ┌──────────────────┐   │                  │
-│              │  │ ••••••••••••      │   │                  │
-│              │  └──────────────────┘   │                  │
-│              │                          │                  │
-│              │  ┌──────────────────┐   │                  │
-│              │  │    Sign in       │   │                  │
-│              │  └──────────────────┘   │                  │
-│              │                          │                  │
-│              │  Don't have an account? │                  │
-│              │  Sign up                 │                  │
-│              └──────────────────────────┘                  │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────┐
+│              WeUp Career                    │
+│         (Hướng nghiệp cùng bạn)            │
+│        ┌──────────────────────┐            │
+│        │  Chào mừng trở lại    │            │
+│        │  Email  [__________]  │            │
+│        │  Mật khẩu [________]  │            │
+│        │  [     Đăng nhập    ] │            │
+│        │  Chưa có tài khoản?   │            │
+│        │  Tạo tài khoản        │            │
+│        └──────────────────────┘            │
+└───────────────────────────────────────────┘
 ```
 
-### Main Todo Page
-
+### Dashboard học sinh
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  ✓ Todos                            user@example.com ▾      │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─ Filter bar ─────────────────────────────────────────┐  │
-│  │ 🔍 Search todos...    [All][Open][In Progress][Done]  │  │
-│  │ Tags: [work ×] [personal ×]  Priority: [High ▾]       │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                                                             │
-│  ┌─ Add task ────────────────────────────────────────────┐  │
-│  │  + What do you need to do?              [+ Add detail] │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                                                             │
-│  TODAY  ─────────────────────────────────────────────────   │
-│                                                             │
-│  ⠿ [ ] Buy groceries            🏷️ personal  📅 Today  ⚡   │
-│  ⠿ [ ] Review PR #142           🏷️ work              🔥   │
-│  ⠿ [✓] Book dentist appointment  🏷️ personal  ~~Done~~      │
-│                                                             │
-│  UPCOMING  ─────────────────────────────────────────────   │
-│                                                             │
-│  ⠿ [ ] Prepare quarterly report  🏷️ work   📅 Jun 1   🔥   │
-│  ⠿ [ ] Call Mom                  🏷️ personal  📅 Jun 3  ─   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-
-Legend: ⠿ drag handle  [ ] checkbox  ~~text~~ strikethrough
-        🏷️ tag  📅 due date  🔥 high  ⚡ medium  ─ low priority
+┌───────────────────────────────────────────────────────────┐
+│  WeUp Career                         hocsinh@email  ▾       │
+├───────────────────────────────────────────────────────────┤
+│  Tôi là ai?   │  Tôi muốn đi đâu?  │  Đến đó bằng cách nào? │
+│  (trắc nghiệm)│  (khám phá nghề)   │  (lộ trình & gợi ý)   │
+├───────────────────────────────────────────────────────────┤
+│  Tiến bộ năng lực:  [▓▓▓░░] Khám phá bản thân (A)           │
+│                     [▓▓░░░] Thông tin nghề (K)              │
+│  Gợi ý gần đây:  "Nhóm Investigative nổi trội — xem ngành…" │
+│                  [Xem lý do]  [Chấp nhận] [Để sau]          │
+│  🔒 Kết quả trắc nghiệm là dữ liệu riêng tư của bạn.        │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Accessibility Design
+## Thiết kế khả năng tiếp cận (Accessibility — WCAG 2.1 AA)
 
-### WCAG 2.1 AA Requirements
+| Yêu cầu | Hiện thực |
+|---|---|
+| Tương phản ≥4.5:1 | Tailwind tokens đã test |
+| Điều hướng bàn phím | Mọi phần tử reachable bằng Tab; focus ring rõ |
+| Screen reader | Radix UI + `aria-*` |
+| Không dùng màu đơn lẻ truyền tin | Giai đoạn/độ sâu hiển thị bằng text + icon + màu |
+| Lỗi gắn với field | `aria-describedby` |
+| Giảm chuyển động | `prefers-reduced-motion` tắt animation |
+| Ngôn ngữ phù hợp lứa tuổi | Nội dung phân tầng theo `school_level` |
 
-| Requirement | Implementation |
-|-------------|---------------|
-| Color contrast ≥4.5:1 | Tailwind design tokens with pre-tested contrast ratios |
-| Keyboard navigation | All interactive elements reachable by Tab; focus ring always visible |
-| Screen reader support | Radix UI components have ARIA labels baked in; custom components use `aria-*` attributes |
-| No color-only information | Priority shown with text + icon + color (never color alone) |
-| Error messages associated with fields | `aria-describedby` links error messages to inputs |
-| Focus management | After modal close/delete, focus returns to logical next element |
-| Reduced motion | `prefers-reduced-motion` media query disables Framer Motion animations |
-
-### Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `n` | Focus "new todo" input |
-| `Escape` | Cancel current editing / close modal |
-| `Enter` | Save todo (when input focused) |
-| `Ctrl+Enter` | Save with expanded details |
-| `/` | Focus search input |
-| `Ctrl+Z` | Undo last action (within 5s window) |
-| `j` / `k` | Navigate todo list (Vim-style — future) |
+### Phím tắt
+| Phím | Hành động |
+|---|---|
+| `/` | Focus ô tìm kiếm nghề |
+| `Escape` | Hủy/đóng panel hiện tại |
+| `g` rồi `a` | Tới Trắc nghiệm |
+| `g` rồi `c` | Tới Thư viện nghề |
+| `g` rồi `p` | Tới Tiến bộ |
 
 ---
 
-## Responsive Design
-
+## Responsive
 | Breakpoint | Layout |
-|------------|--------|
-| Mobile (< 640px) | Single column; filter bar collapses to a "Filters" button; no drag-and-drop (use tap-to-select reorder in v2) |
-| Tablet (640–1024px) | Same as desktop with slightly tighter spacing |
-| Desktop (> 1024px) | Full layout as shown in wireframe above; max-width: 800px centered |
-| Wide (> 1280px) | Sidebar available for tag list (future); main column stays max-width |
+|---|---|
+| Mobile (<640px) | 1 cột; 3 câu hỏi ECG xếp dọc; filter nghề thu gọn |
+| Tablet (640–1024px) | Như desktop, spacing chặt hơn |
+| Desktop (>1024px) | Layout đầy đủ; max-width nội dung đọc tốt |
+| Wide (>1280px) | Sidebar cây năng lực (tùy chọn) |
 
 ---
 
-## Micro-Interactions & Animations
+## Micro-interactions
+| Tương tác | Animation | Thời lượng |
+|---|---|---|
+| Hoàn thành 1 bước test | progress fill | 200ms |
+| Đạt mức năng lực mới (K→A→R) | badge pop + confetti nhẹ | 250ms |
+| Mở thẻ gợi ý | slide + fade | 150ms |
+| Lọc nghề | list reposition | 200ms |
+| Toast | slide up | 150ms |
 
-**Philosophy:** Animations should feel responsive, not decorative. Every animation serves a functional purpose (communicate state change, guide attention).
-
-| Interaction | Animation | Duration |
-|-------------|-----------|----------|
-| Todo created | Slide in from top + fade | 150ms |
-| Todo deleted | Slide out to right + fade | 200ms |
-| Todo completed | Checkbox fill + strikethrough | 200ms ease |
-| Status badge change | Cross-fade | 100ms |
-| Drag lift | Scale 1.02 + shadow | 150ms |
-| Drag drop | Spring return to position | 200ms |
-| Filter change | List items animate position change | 200ms |
-| Toast appear | Slide up from bottom | 150ms |
-| Page load | Skeleton shimmer | 300ms loop |
-
-All animations respect `prefers-reduced-motion: reduce` — degraded to instant state changes.
+Tôn trọng `prefers-reduced-motion: reduce` — chuyển thành đổi trạng thái tức thì.

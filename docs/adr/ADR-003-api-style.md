@@ -24,16 +24,16 @@ The frontend SPA communicates with the backend. We need to decide the API contra
 | Style | Verdict | Reason |
 |-------|---------|--------|
 | **REST + JSON** | ✅ Selected | Industry standard; every HTTP client can consume it; trivial to curl/debug; FastAPI generates OpenAPI automatically; excellent caching semantics; simple to test |
-| GraphQL | ❌ Rejected | Overkill for this data model (simple entities, no deeply nested queries); requires dedicated client library; N+1 query complexity shifts to backend; no simple curl debugging |
+| GraphQL | ❌ Rejected | Overkill cho data model này; client library riêng; N+1 dồn về backend; khó curl-debug. (REST cũng dễ đặt **Consent Guard/audit** tập trung theo route hơn) |
 | tRPC | ❌ Rejected | TypeScript-only coupling — breaks the clean backend/frontend separation; harder to integrate external clients; not framework-agnostic |
 | gRPC | ❌ Rejected | Binary protocol; no browser-native support (requires grpc-web proxy); complex toolchain; wrong abstraction level for a web SPA |
 
 ### REST Design Rules
 
 **Resource naming:**
-- Nouns, plural: `/todos`, `/tags`, `/users`
-- Sub-resources: `/todos/{id}/tags` (future)
-- Batch operations: `/todos/reorder` (action as noun when needed)
+- Nouns, plural: `/assessments`, `/careers`, `/competencies`, `/recommendations`, `/guardians`, `/users`
+- Sub-resources: `/school/{id}/students`, `/me/assessments/{id}`
+- Action as noun khi cần: `/assessments/{type}/submit`, `/recommendations/{id}/confirm`, `/guardians/consent/revoke`
 
 **Idempotency:**
 - GET: idempotent, cacheable

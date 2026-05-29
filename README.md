@@ -1,6 +1,6 @@
 # WeUp Career
 
-> Nền tảng hướng nghiệp cho học sinh và người đi làm tại Việt Nam.
+> Nền tảng Hướng nghiệp Quốc gia cho học sinh, sinh viên và người đi làm tại Việt Nam.
 > _Vươn lên cùng sự nghiệp của bạn — Rise up in your career._
 
 [![CI](https://github.com/org/weup-career/actions/workflows/ci.yml/badge.svg)](https://github.com/org/weup-career/actions)
@@ -11,18 +11,20 @@
 
 ## What it is
 
-**WeUp Career** giúp học sinh, sinh viên và người đi làm tại Việt Nam khám phá bản thân, định hướng và phát triển sự nghiệp.
+**WeUp Career** giúp người học khám phá bản thân, định hướng và phát triển sự nghiệp — hiện thực hóa **5 nội dung hướng nghiệp bắt buộc** theo **TT 16/2026/TT-BGDĐT Điều 5**, dựa trên bộ công cụ chuẩn quốc tế (RIASEC, VIPS, MBTI) và mô hình năng lực hợp nhất từ 3 framework NCDG/ABCD/ECG.
 
-> ⚠️ **Trạng thái domain:** Bộ tài liệu thiết kế hiện tại được khởi tạo theo domain *Todo* (bản nháp ban đầu). Domain thật đã chốt là **hướng nghiệp**. Tập tính năng sản phẩm đang được định nghĩa lại (Phase 1 — redesign). Phần hạ tầng kỹ thuật bên dưới (stack, CI/CD, quality gates, ADR) tái sử dụng được.
+**Tập tính năng (theo `docs/spec.md` — neo vào Điều 5):**
 
-**Định hướng tính năng (đang xác nhận yêu cầu):**
+- **Tài khoản đa người dùng + cổng giám hộ <16** — đăng ký, JWT + cookie httpOnly; **đồng ý của người giám hộ là bắt buộc cho trẻ <16** _(Điều 5đ; ADR-010)_
+- **Trắc nghiệm định hướng (Điều 5b)** — RIASEC + VIPS + MBTI; kết quả là **dữ liệu nhạy cảm** (mã hóa + audit; ADR-011)
+- **Thư viện ngành/nghề (Điều 5a)** — thông tin nghề, trường, GDNN, xu hướng thị trường
+- **Kỹ năng lựa chọn nghề (Điều 5c)** — lộ trình ra quyết định, so sánh ngành
+- **Trải nghiệm nghề (Điều 5d)** — mô phỏng "một ngày làm nghề"
+- **Gợi ý nghề/lộ trình có giải thích** — AI human-in-the-loop, **không ép buộc phân luồng** _(ADR-012)_
+- **Đo tiến bộ năng lực 2 trục** — K-A-R × giai đoạn phát triển; cây 12 năng lực _(ADR-013)_
+- **Module sức khỏe tinh thần** (ABCD NL4, gắn TT 18/2025) + **kênh tư vấn học đường 3 tầng** (B2B2C trường học)
 
-- **Tài khoản đa người dùng** — đăng ký, đăng nhập, quản lý phiên JWT + cookie httpOnly _(reusable)_
-- **Hồ sơ hướng nghiệp** — phân theo 2 nhóm: học sinh/sinh viên và người đi làm
-- **Trắc nghiệm định hướng** — ví dụ Holland/RIASEC, MBTI _(chờ chốt phạm vi)_
-- **Tư vấn chọn ngành / chọn trường** — phù hợp bối cảnh tuyển sinh Việt Nam _(chờ chốt)_
-- **Lộ trình kỹ năng & nghề nghiệp** — gợi ý bước phát triển _(chờ chốt)_
-- **Kết nối mentor / thông tin thị trường lao động** _(chờ chốt)_
+**Phạm vi MVP:** Học sinh THCS + THPT → mở rộng Tiểu học → người đi làm.
 
 ---
 
@@ -31,13 +33,13 @@
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.0 (async), Alembic, Pydantic v2 |
-| Database | SQLite 3.45 (WAL mode), aiosqlite |
-| Auth | JWT (HS256) + httpOnly refresh cookies, bcrypt |
+| Database | SQLite 3.45 (MVP) → PostgreSQL (production); trường nhạy cảm mã hóa (Field Crypto) |
+| Auth | JWT (HS256) + httpOnly refresh cookies, bcrypt; Consent Guard + RBAC quan hệ |
 | Frontend | React 18, TypeScript 5, Vite 5 |
 | State | TanStack Query v5 (server) + Zustand (client) |
-| UI | Tailwind CSS, Radix UI, Framer Motion, @dnd-kit |
+| UI | Tailwind CSS, Radix UI, Framer Motion, Recharts (biểu đồ tiến bộ) |
 | Proxy | Nginx (TLS, rate limiting, static serving) |
-| CI/CD | GitHub Actions |
+| CI/CD | GitHub Actions (gồm bias test + TLC) |
 | Containers | Docker, Docker Compose |
 
 ---
@@ -48,11 +50,11 @@
 
 ```bash
 git clone https://github.com/org/weup-career.git && cd weup-career
-cp .env.example .env          # Edit SECRET_KEY with a random value
+cp .env.example .env          # Đặt SECRET_KEY và FIELD_ENCRYPTION_KEY (openssl rand -hex 32)
 docker compose up --build
 ```
 
-Open **http://localhost** — register an account to get started.
+Mở **http://localhost** — đăng ký tài khoản để bắt đầu (người <16 sẽ qua luồng đồng ý giám hộ).
 
 API documentation: **http://localhost/api/v1/docs**
 
@@ -60,29 +62,24 @@ API documentation: **http://localhost/api/v1/docs**
 
 ## Documentation
 
-This project follows the [Diátaxis](https://diataxis.fr/) documentation framework and [arc42](https://arc42.org/) architecture structure.
+Theo [Diátaxis](https://diataxis.fr/) + [arc42](https://arc42.org/).
 
-### Tutorials (Learning-oriented)
-- [Quick Start](README.md#quick-start) — Get running in 2 minutes
-- [Local Development Guide](docs/operations/deployment-guide.md) — Dev environment setup
+### Nền tảng domain (đọc trước)
+- [Master NLSpec](docs/spec.md) — đặc tả sản phẩm (8 phần, 8 thuộc tính đúng đắn)
+- [Căn cứ pháp lý](docs/legal/legal-basis.md) — VBPL VN, TT 16/2026 Điều 5, BVDLCN, AI governance
+- [Tổng hợp 3 framework quốc tế](docs/research/career-frameworks-synthesis.md) — mô hình 2 trục, crosswalk Điều 5
+- [Thư viện nguồn](docs/research/sources.md)
 
-### How-To Guides (Task-oriented)
-- [Deployment Guide](docs/operations/deployment-guide.md) — Production deployment
-- [Database Migrations](docs/operations/deployment-guide.md#database-migrations) — Schema changes
-- [Rotating Secrets](docs/operations/runbook.md#runbook-4-rotating-jwt-secret-key) — Key rotation
+### Reference
+- [API Contract](http://localhost/api/v1/docs) — OpenAPI 3.1 (live)
+- [Architecture Overview](docs/architecture/overview.md) — C4 + component
+- [Data Flow](docs/architecture/data-flow.md) · [Security Design](docs/security/auth-design.md)
 
-### Reference (Information-oriented)
-- [API Contract](http://localhost/api/v1/docs) — OpenAPI 3.1 (live docs)
-- [Architecture Overview](docs/architecture/overview.md) — C4 model + component diagrams
-- [Data Flow](docs/architecture/data-flow.md) — Request/response flows
-- [Security Design](docs/security/auth-design.md) — Auth & authorization model
-
-### Explanation (Understanding-oriented)
-- [Architecture Decisions](docs/adr/) — Why we chose each technology
-- [Threat Model](docs/security/threat-model.md) — STRIDE analysis
-- [Formal Verification](docs/formal-verification/tla-spec-design.md) — TLA+ specification design
-- [Scalability Strategy](docs/scalability/strategy.md) — Growth path
-- [Testing Strategy](docs/testing/strategy.md) — Test architecture
+### Explanation
+- [Architecture Decisions](docs/adr/) — 13 ADR
+- [Threat Model](docs/security/threat-model.md) — STRIDE + AI threats
+- [Formal Verification](docs/formal-verification/tla-spec-design.md) — TLA+ (CP-1…CP-8)
+- [Scalability](docs/scalability/strategy.md) · [Testing](docs/testing/strategy.md)
 
 ---
 
@@ -92,34 +89,26 @@ This project follows the [Diátaxis](https://diataxis.fr/) documentation framewo
 weup-career/
 ├── backend/                    # FastAPI application
 │   ├── app/
-│   │   ├── auth/               # Authentication & authorization
-│   │   ├── <domain>/           # Feature modules (career domain — TBD redesign)
-│   │   └── core/               # Config, DB, logging, middleware
-│   ├── migrations/             # Alembic database migrations
-│   └── tests/                  # pytest unit + integration tests
-├── frontend/                   # React SPA
-│   ├── src/
-│   │   ├── features/           # Auth + career-domain feature modules (TBD redesign)
-│   │   ├── components/         # Shared UI components
-│   │   ├── api/                # Typed API client
-│   │   └── store/              # Zustand state stores
-│   └── e2e/                    # Playwright E2E tests
-├── nginx/                      # Nginx configuration
-├── tla/                        # TLA+ formal specifications
-├── docs/                       # All documentation
-│   ├── spec.md                 # Master NLSpec
-│   ├── architecture/           # Diagrams and architecture docs
-│   ├── adr/                    # Architecture Decision Records
-│   ├── security/               # Threat model, auth design
-│   ├── testing/                # Test strategy
-│   ├── ux/                     # User flows, wireframes
-│   ├── formal-verification/    # TLA+ spec design
-│   ├── scalability/            # Growth strategy
-│   └── operations/             # Runbook, deployment guide
-├── scenarios/                  # Holdout test scenarios (not seen by coder)
-├── docker-compose.yml          # Development
-├── docker-compose.prod.yml     # Production overrides
-└── .env.example                # Environment template
+│   │   ├── auth/               # Xác thực, token
+│   │   ├── guardians/          # GuardianLink, GuardianConsent (<16)
+│   │   ├── assessments/        # RIASEC/VIPS/MBTI (dữ liệu nhạy cảm)
+│   │   ├── competency/         # Cây 12 năng lực, tiến bộ K-A-R
+│   │   ├── careers/            # Thư viện nghề, nội dung, lộ trình
+│   │   ├── reco/               # Gợi ý (human-in-the-loop)
+│   │   ├── counseling/         # Trường, lớp, phiên tư vấn 3 tầng
+│   │   └── core/               # config, db, consent, authz, audit, crypto, logging
+│   ├── migrations/             # Alembic
+│   └── tests/                  # pytest unit + integration
+├── frontend/                   # React SPA (features: auth, guardian, assessment,
+│   │                           #   competency, careers, reco, wellbeing, counseling)
+│   └── e2e/                    # Playwright
+├── nginx/                      # Nginx config
+├── tla/                        # TLA+ specs (ConsentLifecycle, SensitiveDataAccess, …)
+├── docs/                       # spec.md, legal/, research/, architecture/, adr/,
+│                               #   security/, testing/, ux/, formal-verification/,
+│                               #   scalability/, operations/
+├── scenarios/                  # Holdout scenarios (coder không xem)
+├── docker-compose.yml · docker-compose.prod.yml · .env.example
 ```
 
 ---
@@ -127,21 +116,10 @@ weup-career/
 ## Development
 
 ```bash
-# Backend tests
 docker compose exec backend pytest --cov=app --cov-report=term-missing
-
-# Frontend tests
 docker compose exec frontend npm test
-
-# E2E tests (requires running stack)
 docker compose exec frontend npx playwright test
-
-# Type checking
 docker compose exec backend mypy app/ --strict
-docker compose exec frontend npx tsc --noEmit
-
-# Security scan
-docker compose exec backend pip-audit
 trivy image weup-career-backend:latest
 ```
 
@@ -149,19 +127,18 @@ trivy image weup-career-backend:latest
 
 ## Quality Gates (CI)
 
-Every PR must pass:
-
 | Gate | Tool | Threshold |
 |------|------|-----------|
 | Python types | mypy --strict | Zero errors |
-| Backend tests | pytest | ≥95% coverage |
-| Frontend tests | vitest | ≥95% coverage |
+| Backend tests | pytest | ≥95% (100% consent/sensitive/auth/reco) |
+| Frontend tests | vitest | ≥95% |
 | TypeScript | tsc --noEmit | Zero errors |
 | Linting | ruff + eslint | Zero warnings |
-| Container scan | Trivy | No HIGH/CRITICAL CVEs |
+| Container scan | Trivy | No HIGH/CRITICAL |
 | SAST | Semgrep | Zero findings |
+| **Bias test** | công bằng giới/vùng/hoàn cảnh | Trong ngưỡng (NFR-12) |
 | E2E | Playwright (3 browsers) | All pass |
-| TLA+ | TLC model checker | No invariant violations |
+| TLA+ | TLC | CP-1…CP-8 pass |
 
 ---
 
@@ -170,30 +147,30 @@ Every PR must pass:
 | ADR | Decision |
 |-----|---------|
 | [ADR-001](docs/adr/ADR-001-framework-selection.md) | FastAPI + React + TypeScript + Vite |
-| [ADR-002](docs/adr/ADR-002-database.md) | SQLite with SQLAlchemy abstraction for future migration |
+| [ADR-002](docs/adr/ADR-002-database.md) | SQLite → PostgreSQL qua SQLAlchemy abstraction |
 | [ADR-003](docs/adr/ADR-003-api-style.md) | REST over HTTP/JSON, OpenAPI 3.1 |
-| [ADR-004](docs/adr/ADR-004-state-management.md) | TanStack Query + Zustand (two-state model) |
-| [ADR-005](docs/adr/ADR-005-testing-strategy.md) | pytest + Vitest + Playwright multi-browser |
-| [ADR-006](docs/adr/ADR-006-docker-strategy.md) | Multi-stage builds, dev/prod compose split |
-| [ADR-007](docs/adr/ADR-007-cicd.md) | GitHub Actions, parallel gates, manual prod approval |
-| [ADR-008](docs/adr/ADR-008-security-controls.md) | JWT + httpOnly cookies, OWASP Top 10 mitigations |
-| [ADR-009](docs/adr/ADR-009-scalability.md) | Stateless backend, hexagonal architecture, scale-up path |
+| [ADR-004](docs/adr/ADR-004-state-management.md) | TanStack Query + Zustand |
+| [ADR-005](docs/adr/ADR-005-testing-strategy.md) | pytest + Vitest + Playwright + bias test |
+| [ADR-006](docs/adr/ADR-006-docker-strategy.md) | Multi-stage builds, dev/prod compose |
+| [ADR-007](docs/adr/ADR-007-cicd.md) | GitHub Actions, parallel gates |
+| [ADR-008](docs/adr/ADR-008-security-controls.md) | JWT + httpOnly, OWASP Top 10 |
+| [ADR-009](docs/adr/ADR-009-scalability.md) | Stateless, hexagonal, scale-up path |
+| [ADR-010](docs/adr/ADR-010-guardian-consent.md) | **Kiến trúc đồng ý giám hộ <16 (CP-1/CP-2)** |
+| [ADR-011](docs/adr/ADR-011-sensitive-data.md) | **Mã hóa + audit dữ liệu nhạy cảm (CP-3)** |
+| [ADR-012](docs/adr/ADR-012-ai-recommendation-governance.md) | **AI governance: human-in-the-loop, bias (CP-5/6)** |
+| [ADR-013](docs/adr/ADR-013-two-axis-competency-model.md) | **Mô hình năng lực 2 trục K-A-R × giai đoạn** |
 
 ---
 
 ## Contributing
 
-1. Branch from `main` → `feat/<topic>` or `fix/<topic>`
-2. Write tests first (TDD)
-3. All CI gates must pass before opening PR
-4. Squash merge after approval
+1. Branch từ `main` → `feat/<topic>` hoặc `fix/<topic>`
+2. Viết test trước (TDD)
+3. Mọi CI gate phải pass trước khi mở PR
+4. Squash merge sau khi được duyệt
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
-
----
-
-> **Status:** Đã đổi thương hiệu sang **WeUp Career**. Hạ tầng kỹ thuật + ADR tái sử dụng. Domain nghiệp vụ (spec, kiến trúc, TLA+, UX) đang được thiết kế lại từ Todo → Hướng nghiệp.
+MIT — xem [LICENSE](LICENSE)

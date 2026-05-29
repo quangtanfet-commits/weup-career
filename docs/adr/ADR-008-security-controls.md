@@ -46,10 +46,10 @@ Use **JWT (access) + httpOnly cookie (refresh)** for authentication. Full OWASP 
 
 | OWASP Category | Mitigation |
 |----------------|-----------|
-| A01 Broken Access Control | Ownership check in every repository method; no object ID exposed without user_id verification; 403 vs 404 policy |
-| A02 Cryptographic Failures | bcrypt cost≥12; JWT HS256; HTTPS enforced; no PII in logs |
+| A01 Broken Access Control | Ownership check mọi repository; **RBAC quan hệ guardian↔child, counselor↔student theo school_id (CP-4)**; **Consent Guard cho <16 (CP-1)**; 403 vs 404 policy |
+| A02 Cryptographic Failures | bcrypt cost≥12; JWT HS256; HTTPS; **mã hóa trường nhạy cảm — kết quả trắc nghiệm (Field Crypto, `FIELD_ENCRYPTION_KEY`)**; không PII trong log |
 | A03 Injection | Pydantic validation (no raw string interpolation); SQLAlchemy ORM (parameterized queries only); CSP headers |
-| A04 Insecure Design | Threat model produced; security review required before v1 release |
+| A04 Insecure Design | Threat model produced; **DPIA + phân loại rủi ro AI (Luật 134/2025)**; **human-in-the-loop & rationale cho gợi ý (CP-5/CP-6)**; security review trước release |
 | A05 Security Misconfiguration | No DEBUG mode in production; security headers in Nginx; no exposed admin endpoints |
 | A06 Vulnerable Components | `trivy` + `pip-audit` + `npm audit` in CI; dependabot alerts enabled |
 | A07 Auth Failures | Rate limiting on /auth/*; generic error messages (no email enumeration); bcrypt timing safety |

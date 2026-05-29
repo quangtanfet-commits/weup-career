@@ -56,7 +56,7 @@ Use **multi-stage Docker builds** for both backend and frontend, with distinct `
 - TLS via Let's Encrypt certs in volume
 - Strict CORS
 - INFO logging
-- Docker secrets for SECRET_KEY (not env var)
+- Docker secrets cho `SECRET_KEY` **và `FIELD_ENCRYPTION_KEY`** (mã hóa kết quả trắc nghiệm) — không dùng env var
 
 ---
 

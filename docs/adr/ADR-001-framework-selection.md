@@ -1,8 +1,10 @@
 # ADR-001: Framework Selection
 
-**Status:** Accepted  
-**Date:** 2026-05-27  
-**Deciders:** Engineering Team  
+**Status:** Accepted (cập nhật cho domain WeUp Career)
+**Date:** 2026-05-27 (rev. 2026-05-29)
+**Deciders:** Engineering Team
+
+> Quyết định stack nền tảng (FastAPI + React/TS/Vite) **giữ nguyên** cho WeUp Career. Bản cập nhật chỉ điều chỉnh ví dụ thư viện theo domain hướng nghiệp (bỏ drag-reorder của todo; thêm thư viện biểu đồ cho dashboard tiến bộ năng lực).
 
 ---
 
@@ -93,7 +95,7 @@ Use **React 18** with **TypeScript 5** and **Vite 5** as the build tool.
 
 ### Consequences
 - JSX/TSX: all components use TypeScript strict mode (no `any`, no implicit returns)
-- No SSR in v1; CSR-only (impacts first-load time for unauthenticated users — acceptable since all content is behind login)
+- No SSR in v1; CSR-only. Lưu ý: thư viện nghề (Điều 5a) là **nội dung công khai** truy cập được khi chờ consent — cân nhắc pre-render/SEO cho phần công khai ở giai đoạn sau nếu cần
 - Bundle size discipline: track with `rollup-plugin-visualizer`; target <250KB gzipped initial bundle
 
 ---
@@ -121,6 +123,6 @@ Use **React 18** with **TypeScript 5** and **Vite 5** as the build tool.
 | React Hook Form + Zod | Forms + validation | 7.x + 3.x | Formik (slower, heavier); Yup (less type-safe than Zod) |
 | Tailwind CSS | Styling | 3.x | Styled-components (runtime CSS-in-JS perf cost); CSS Modules (less DX) |
 | Radix UI | Accessible primitives | 1.x | Headless UI (less comprehensive) |
-| @dnd-kit/core | Drag-and-drop reorder | 6.x | react-beautiful-dnd (deprecated) |
-| Framer Motion | Animations | 11.x | CSS transitions only (less control over list animations) |
+| Recharts / visx | Biểu đồ tiến bộ năng lực (2 trục K-A-R × giai đoạn) | 2.x | Chart.js (kém type-safe/React-idiomatic) |
+| Framer Motion | Animations | 11.x | CSS transitions only |
 | Axios | HTTP client | 1.x | fetch API (no interceptors out-of-the-box; less ergonomic retry) |

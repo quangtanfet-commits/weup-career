@@ -1,155 +1,139 @@
-# Threat Model
+# Threat Model — WeUp Career
 
-**Version:** 1.0.0 | **Date:** 2026-05-27  
-**Framework:** STRIDE  
-**Scope:** Todo Application v1 (Backend API + Frontend SPA + Docker deployment)
+**Phiên bản:** 2.0.0 | **Ngày:** 2026-05-29
+**Framework:** STRIDE + DREAD
+**Phạm vi:** Nền tảng Hướng nghiệp Quốc gia (Backend API + Frontend SPA + Recommendation Engine + Docker)
+**Thay thế:** v1.0.0 (threat model Todo app)
+
+> Neo vào [`docs/legal/legal-basis.md`](../legal/legal-basis.md) §6 (BVDLCN), §7 (AI governance) và [`docs/spec.md`](../spec.md) §8 (CP). Tài sản nhạy cảm trọng tâm: **kết quả trắc nghiệm (RIASEC/VIPS/MBTI)**, **dữ liệu trẻ <16**, **gợi ý nghề**.
 
 ---
 
-## System Overview for Threat Modeling
+## Tổng quan hệ thống cho threat modeling
 
 ```
 [Internet]
     │
     ▼
-[Nginx — TLS termination, rate limiting, security headers]
+[Nginx — TLS, rate limit, security headers]
     │
-    ├──→ [Static Files — Frontend SPA bundle]
-    │
+    ├──→ [Static — Frontend SPA]
     └──→ [Backend API — FastAPI]
-              │
-              └──→ [SQLite Database]
+              │  (Auth → Consent Guard → RBAC → Audit)
+              ├──→ [Recommendation Engine] (AI có kiểm soát)
+              ├──→ [Database] (trường nhạy cảm mã hóa)
+              └──→ [Audit Store] (append-only)
 ```
 
-**Trust Boundaries:**
-1. Internet → Nginx (TLS; untrusted input)
-2. Nginx → Backend API (internal Docker network; trusted)
-3. Backend API → SQLite (same container or mounted volume; trusted)
+**Trust boundaries:**
+1. Internet → Nginx (TLS; input không tin cậy)
+2. Nginx → Backend (mạng Docker nội bộ; tin cậy)
+3. Backend → DB / Audit Store (volume; tin cậy)
+4. **Backend ↔ Recommendation Engine** (ranh giới AI governance — đầu ra phải có rationale, bias-tested)
+5. **Cổng đồng ý giám hộ** (ranh giới pháp lý: dữ liệu trẻ <16)
 
 ---
 
-## STRIDE Threat Analysis
+## Phân tích STRIDE
 
 ### S — Spoofing
 
-| Threat | Asset | Likelihood | Impact | Mitigation |
-|--------|-------|-----------|--------|-----------|
-| Attacker spoofs a legitimate user's session | Auth tokens | Medium | Critical | JWT signature verification; httpOnly cookie for refresh token; token rotation on use |
-| Attacker registers with another user's email | User identity | Low | Medium | Email uniqueness constraint; bcrypt prevents credential stuffing |
-| Attacker replays a refresh token | Refresh token | Low | High | Single-use rotation; revocation on logout; SHA-256 hash stored (raw never in DB) |
-| Attacker presents a forged JWT | Access token | Low | Critical | HS256 signature verification; server-side secret key validation; exp claim enforced |
-
-**Mitigations implemented:**
-- All protected routes require valid, unexpired JWT signature verification
-- Refresh token value is hashed before storage — even a DB dump reveals only hashes
-- Token rotation: using a refresh token immediately invalidates it and issues a new one
-
----
+| Mối đe dọa | Tài sản | Khả năng | Tác động | Giảm thiểu |
+|---|---|---|---|---|
+| Giả mạo phiên người dùng hợp pháp | Auth tokens | TB | Critical | JWT signature; refresh httpOnly; rotation |
+| **Giả mạo người giám hộ để cấp đồng ý cho trẻ <16** | GuardianConsent | TB | **Critical (pháp lý)** | Xác thực giám hộ qua kênh độc lập (email/**VNeID**); GuardianLink.verified_at; không cho self-consent |
+| Giả mạo vai trò counselor/school_admin | Phân quyền trường | Thấp | Cao | Cấp tài khoản qua school_admin; ràng buộc school_id |
+| Replay refresh token | Refresh token | Thấp | Cao | Single-use rotation; revoke on logout; lưu SHA-256 |
+| JWT giả | Access token | Thấp | Critical | HS256 verify; exp enforced |
 
 ### T — Tampering
 
-| Threat | Asset | Likelihood | Impact | Mitigation |
-|--------|-------|-----------|--------|-----------|
-| Attacker modifies todo data of another user | Todo records | Medium | High | user_id ownership check on every DB query; SQLAlchemy WHERE user_id = current_user.id |
-| Attacker tampers with JWT claims (e.g., changes user_id) | JWT payload | Low | Critical | HS256 signature; any modification invalidates signature |
-| Attacker modifies request body to inject SQL | DB queries | Low | Critical | SQLAlchemy ORM parameterized queries; Pydantic input validation |
-| Attacker tampers with API response in transit | Response data | Low | High | HTTPS enforced (Nginx TLS); HSTS header |
-
-**Mitigations implemented:**
-- All API mutations verify the requested resource belongs to `current_user`
-- No raw SQL strings; all queries through SQLAlchemy ORM
-- HTTPS with TLS 1.2+ minimum; HSTS with max-age=31536000
-
----
+| Mối đe dọa | Tài sản | Khả năng | Tác động | Giảm thiểu |
+|---|---|---|---|---|
+| Sửa dữ liệu hướng nghiệp của người khác | Result/Progress | TB | Cao | Ownership check mọi query (CP-4) |
+| **Sửa/giả kết quả trắc nghiệm** | AssessmentResult | Thấp | Cao | Mã hóa + versioned (không ghi đè); audit |
+| **Sửa `rationale`/bỏ qua human-confirm để ép gợi ý có hiệu lực** | Recommendation | Thấp | **Cao (pháp lý)** | CP-5/CP-6 (TLA+); rationole NOT NULL; chỉ người chuyển trạng thái |
+| SQL injection | DB | Thấp | Critical | SQLAlchemy parameterized; Pydantic |
+| Sửa response trên đường truyền | Response | Thấp | Cao | HTTPS/HSTS |
 
 ### R — Repudiation
 
-| Threat | Asset | Likelihood | Impact | Mitigation |
-|--------|-------|-----------|--------|-----------|
-| User denies performing an action (todo delete, etc.) | Audit trail | Low | Medium | Structured logs with user_id and action on every mutating operation |
-| Attacker covers tracks by manipulating logs | Log integrity | Very Low | Medium | Logs to stdout (container) → external log shipper; not modifiable by app |
+| Mối đe dọa | Tài sản | Khả năng | Tác động | Giảm thiểu |
+|---|---|---|---|---|
+| Chối truy cập dữ liệu nhạy cảm | Audit trail | TB | **Cao** | **Audit mọi đọc kết quả nhạy cảm (CP-3)**; append-only |
+| Chối thay đổi consent | Consent log | Thấp | Cao | Ghi audit granted/revoked + actor |
+| Chối ai xác nhận gợi ý | Reco log | Thấp | TB | Lưu confirmed_by + decision (giải trình AI) |
+| Sửa log che dấu vết | Log integrity | Rất thấp | TB | Log stdout → shipper; audit store append-only |
 
-**Mitigations implemented:**
-- Every request logged with: timestamp, user_id (post-auth), method, path, status_code, request_id
-- Soft deletes preserve records with timestamps (30-day window)
-- Logs streamed to stdout; not stored in a file the application can write to
+### I — Information Disclosure ★ (rủi ro lõi của domain này)
 
----
-
-### I — Information Disclosure
-
-| Threat | Asset | Likelihood | Impact | Mitigation |
-|--------|-------|-----------|--------|-----------|
-| Stack traces exposed in API 500 responses | Internal architecture | Low | Low | All exceptions caught; generic "Internal server error" returned; full trace in logs only |
-| Tokens logged | Auth tokens | Low | Critical | Tokens never logged; structured logger strips `Authorization` header |
-| Email enumeration via login error messages | User email list | Medium | Low | Generic "Invalid email or password" for all auth failures |
-| DB file accessible on disk | All user data | Very Low | Critical | DB volume owned by appuser; not bind-mounted in production; Docker secrets for config |
-| Error messages leak email existence on register | User email list | Low | Low | Register returns 409 Conflict without specifying what already exists (or use generic message) |
-| Sensitive query params in logs | URLs | Low | Medium | Log path but not query string content; filter `password=` patterns |
-
-**Mitigations implemented:**
-- `expose_server_errors=False` equivalent: never expose tracebacks to clients
-- Log sanitization: `Authorization` header stripped from access logs
-- Generic auth error messages across all failure modes
-
----
+| Mối đe dọa | Tài sản | Khả năng | Tác động | Giảm thiểu |
+|---|---|---|---|---|
+| **Lộ kết quả RIASEC/VIPS/MBTI** (dữ liệu nhạy cảm) | AssessmentResult | TB | **Critical** | Mã hóa at-rest (Field Crypto); RBAC chặt; audit; KHÔNG log nội dung; không cache lâu ở client |
+| **Lộ dữ liệu trẻ <16** | Hồ sơ trẻ | TB | **Critical (pháp lý)** | Consent gate; quyền xem giới hạn guardian/counselor; tối thiểu hóa dữ liệu |
+| Stack trace trong 500 | Kiến trúc nội bộ | Thấp | Thấp | Không lộ trace; generic error |
+| Token bị log | Auth tokens | Thấp | Critical | Không log token; strip Authorization |
+| Email enumeration | DS email | TB | Thấp | Thông báo generic |
+| File DB lộ trên đĩa | Toàn bộ dữ liệu | Rất thấp | Critical | Volume owned appuser; secrets; trường nhạy cảm vẫn mã hóa |
+| **Suy luận thông tin nhạy cảm từ gợi ý** | Hồ sơ tâm lý | Thấp | TB | Giải thích gợi ý không lộ chi tiết thô; tối thiểu hóa |
 
 ### D — Denial of Service
 
-| Threat | Asset | Likelihood | Impact | Mitigation |
-|--------|-------|-----------|--------|-----------|
-| Brute force login (credential stuffing) | User accounts | High | High | Rate limit: 20 /auth/login req/min per IP; bcrypt slowness inherent defense |
-| Auth endpoint flood (unauthenticated) | Server availability | Medium | Medium | Rate limit: 5 /register + 20 /login req/min per IP; Nginx limit_req |
-| Large payload upload | Server memory | Low | Low | Nginx `client_max_body_size 1m`; Pydantic max field length validation |
-| Long-running DB query | Server availability | Very Low | Medium | SQLite WAL; async IO; query timeouts (SQLAlchemy `connect_args`) |
-| Malformed JSON body | Server stability | Low | Low | Pydantic parses and rejects; no crash; 422 response |
-
-**Mitigations implemented:**
-- slowapi rate limiter on all endpoints
-- Nginx `limit_req_zone` as first line of defense (before Python code runs)
-- Max request body: 1MB (configurable)
-
----
+| Mối đe dọa | Tài sản | Khả năng | Tác động | Giảm thiểu |
+|---|---|---|---|---|
+| Brute force login | Tài khoản | Cao | Cao | Rate limit 20/min/IP; bcrypt chậm |
+| Flood endpoint trắc nghiệm/gợi ý (tốn tính toán) | Khả dụng | TB | TB | Rate limit per-user; hàng đợi/giới hạn reco |
+| Payload lớn | Bộ nhớ | Thấp | Thấp | `client_max_body_size`; Pydantic max length |
+| JSON dị dạng | Ổn định | Thấp | Thấp | Pydantic reject → 422 |
 
 ### E — Elevation of Privilege
 
-| Threat | Asset | Likelihood | Impact | Mitigation |
-|--------|-------|-----------|--------|-----------|
-| User accesses another user's todos via IDOR | Todo ownership | Medium | High | user_id ownership check on EVERY read/write in repository layer; returns 404 (not 403) to avoid confirming existence |
-| User escalates to admin (no admin role in v1) | Authorization | Low | N/A | No admin role in v1; all users equal; no privilege escalation surface |
-| Attacker uses stolen expired token | Auth tokens | Low | Medium | JWT exp claim enforced; expired tokens rejected regardless of signature validity |
-| Attacker runs code via injection in todo title | Process | Very Low | Critical | CSP headers; Pydantic input sanitization; no eval() anywhere; parameterized SQL |
+| Mối đe dọa | Tài sản | Khả năng | Tác động | Giảm thiểu |
+|---|---|---|---|---|
+| IDOR đọc dữ liệu người khác | Result/Progress | TB | Cao | Ownership check repo; trả 404 (không xác nhận tồn tại) |
+| **Counselor truy cập học sinh ngoài trường mình** | Dữ liệu HS | TB | **Cao** | RBAC theo school_id (CP-4); kiểm tra quan hệ counselor↔student |
+| **Guardian xem dữ liệu trẻ không thuộc mình** | Dữ liệu trẻ | Thấp | Cao | Kiểm tra GuardianLink verified |
+| **Bypass cổng consent để xử lý dữ liệu trẻ <16** | Tuân thủ pháp lý | TB | **Critical** | Consent Guard tập trung (CP-1); TLA+ chứng minh không đường vòng |
+| Dùng token hết hạn | Auth | Thấp | TB | exp enforced |
+| Injection qua nội dung nhập | Process | Rất thấp | Critical | CSP; Pydantic; no eval; parameterized SQL |
 
-**Mitigations implemented:**
-- IDOR protection: `WHERE todo.user_id = current_user.id AND todo.id = ?` on all resource access
-- Returns 404 (not 403) when resource doesn't belong to user — avoids confirming existence
-- Content Security Policy headers prevent XSS execution even if injected
+### ★ Mối đe dọa đặc thù AI/đạo đức (ngoài STRIDE cổ điển)
+
+| Mối đe dọa | Tài sản | Giảm thiểu |
+|---|---|---|
+| **Gợi ý thiên lệch** theo giới/vùng/hoàn cảnh | Công bằng | **Bias testing** định kỳ (NFR-12); tài liệu hóa; RIASEC/MBTI không khóa cứng lựa chọn |
+| **Ép buộc phân luồng** (tự động hóa quyết định) | Quyền tự quyết | Human-in-the-loop (CP-5); gợi ý + lý do; "không ép buộc" (TT 16/2026) |
+| **Gợi ý không giải thích được** | Minh bạch AI | rationale NOT NULL (CP-6); Luật 134/2025 Đ.4 |
+| Thao túng đầu vào để bóp méo gợi ý | Tính toàn vẹn | Validate input; rate limit; log input→reco→confirm |
 
 ---
 
-## DREAD Risk Scores
+## Điểm rủi ro DREAD (1–10)
 
-| Threat | D | R | E | A | D | Total | Priority |
-|--------|---|---|---|---|---|-------|----------|
-| JWT spoofing via key compromise | 10 | 7 | 8 | 8 | 6 | 39 | **Critical** |
-| IDOR — user accesses another user's todos | 7 | 8 | 5 | 7 | 8 | 35 | **High** |
-| Credential stuffing / brute force | 8 | 7 | 7 | 8 | 6 | 36 | **High** |
+| Mối đe dọa | D | R | E | A | D | Tổng | Ưu tiên |
+|---|---|---|---|---|---|---|---|
+| **Lộ kết quả trắc nghiệm (dữ liệu nhạy cảm)** | 9 | 6 | 6 | 9 | 6 | **36** | **Critical** |
+| **Bypass cổng consent <16** | 9 | 6 | 6 | 8 | 6 | **35** | **Critical** |
+| JWT spoofing qua lộ khóa | 10 | 7 | 8 | 8 | 6 | 39 | **Critical** |
+| Giả mạo giám hộ cấp consent | 8 | 6 | 6 | 7 | 6 | 33 | **High** |
+| Counselor vượt phạm vi trường | 7 | 7 | 5 | 7 | 7 | 33 | **High** |
+| IDOR dữ liệu hướng nghiệp | 7 | 8 | 5 | 7 | 8 | 35 | **High** |
+| Gợi ý thiên lệch (bias) | 6 | 6 | 5 | 9 | 5 | 31 | **High** |
+| Credential stuffing | 8 | 7 | 7 | 8 | 6 | 36 | High |
 | SQL injection | 10 | 4 | 8 | 5 | 4 | 31 | High |
 | Refresh token replay | 9 | 4 | 5 | 5 | 5 | 28 | Medium |
 | Email enumeration | 3 | 7 | 3 | 8 | 7 | 28 | Medium |
-| XSS in todo content | 7 | 5 | 5 | 5 | 4 | 26 | Medium |
-| Stack trace disclosure | 3 | 5 | 2 | 7 | 7 | 24 | Low |
-
-*(D=Damage, R=Reproducibility, E=Exploitability, A=Affected users, D=Discoverability, scale 1-10)*
 
 ---
 
-## Residual Risks Accepted
+## Rủi ro tồn dư được chấp nhận
 
-| Risk | Reason Accepted |
-|------|----------------|
-| Single point of failure (single node v1) | Intentional for v1 simplicity; HA in Phase 3 |
-| No email-based account recovery | SMTP integration deferred to v2 |
-| No 2FA / MFA | Deferred to v2 |
-| SQLite single-writer bottleneck | Acceptable at v1 scale; migration path designed |
-| No audit log for READ operations | Read-heavy workload; too noisy; writes are audited |
+| Rủi ro | Lý do |
+|---|---|
+| Single node ở MVP | Đơn giản hóa MVP; HA ở giai đoạn sau (xem scalability) |
+| Chưa tích hợp VNeID đầy đủ ở MVP | Xác thực giám hộ qua email ở MVP; VNeID tăng cường giai đoạn sau |
+| Chưa 2FA/MFA | Giai đoạn sau; ưu tiên consent & dữ liệu nhạy cảm trước |
+| Không audit READ dữ liệu **không nhạy cảm** | Quá ồn; **READ dữ liệu nhạy cảm thì BẮT BUỘC audit (CP-3)** |
+| SQLite single-writer ở MVP | Chấp nhận ở quy mô MVP; lộ trình Postgres đã thiết kế |
+
+> **Không chấp nhận** (phải xử lý trước phát hành): bất kỳ đường nào bypass Consent Guard, bất kỳ READ kết quả nhạy cảm không sinh audit, bất kỳ gợi ý thiếu rationale hoặc tự áp dụng không qua người. Đây là các CP bắt buộc + cần DPIA (spec.md Gate A/C).

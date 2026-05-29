@@ -65,6 +65,8 @@ jobs:
 | SAST | `semgrep --config p/python p/react p/security` | Any finding |
 | E2E | Playwright (all 3 browsers) | Any failure |
 | OpenAPI schema | `openapi-spec-validator` | Invalid schema |
+| **Bias test** | bộ trắc nghiệm + thuật toán gợi ý (giới/vùng/hoàn cảnh) | Vượt ngưỡng chênh lệch (NFR-12) |
+| **Formal (TLC)** | TLA+ CP-1…CP-8 (nếu đổi state machine consent/reco/auth/progress) | Bất kỳ invariant fail |
 
 ---
 

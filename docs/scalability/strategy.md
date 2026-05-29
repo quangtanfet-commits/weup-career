@@ -1,237 +1,161 @@
-# Scalability & Reliability Strategy
+# Chiến lược Khả năng Mở rộng & Độ tin cậy — WeUp Career
 
-**Version:** 1.0.0 | **Date:** 2026-05-27
+**Phiên bản:** 2.0.0 | **Ngày:** 2026-05-29
+**Thay thế:** v1.0.0 (scalability Todo app)
 
----
-
-## Reliability Targets
-
-| Tier | Metric | Target |
-|------|--------|--------|
-| Availability | Uptime per month | 99.9% (≤43 min/month downtime) |
-| Latency | p50 read latency | <20ms |
-| Latency | p99 read latency | <100ms |
-| Latency | p99 write latency | <200ms |
-| Error rate | 5xx errors | <0.1% of requests |
-| Recovery | Time to recover from crash | <30 seconds |
+> Quy mô mục tiêu: nền tảng hướng nghiệp **quốc gia** (B2B2C trường học). MVP single-node SQLite → PostgreSQL + multi-node khi mở rộng cấp Sở/toàn quốc. Lưu ý ràng buộc **dữ liệu nhạy cảm** (không cache thô) và **audit append-only**.
 
 ---
 
-## Failure Modes & Isolation
+## Mục tiêu độ tin cậy
+| Tiêu chí | Mục tiêu |
+|---|---|
+| Uptime/tháng | 99.9% (≤43 phút) |
+| p50 read | <30ms |
+| p99 read | <150ms |
+| p99 write | <300ms |
+| 5xx rate | <0.1% |
+| Thời gian phục hồi sau crash | <30s |
 
-### Database Unavailability
+---
 
-- Backend catches SQLAlchemy `OperationalError` at repository level
-- Maps to HTTP 503 `{"error": {"code": "SERVICE_UNAVAILABLE"}}`
-- No stack trace exposed to client
-- `/api/v1/ready` returns 503 → container orchestrator stops routing traffic
-- SQLite process: DB locks release on process exit (no manual cleanup)
+## Failure modes & cô lập
 
-### Uvicorn Worker Crash
+### DB không sẵn sàng
+- Repository bắt `OperationalError` → HTTP 503 `SERVICE_UNAVAILABLE`; không lộ trace.
+- `/api/v1/ready` trả 503 → orchestrator ngừng route traffic.
 
-- Gunicorn (production) detects dead worker, respawns within 5s
-- In-flight requests to dead worker → client sees TCP reset → client retries
-- Other workers continue serving traffic (no full outage)
-- Dev: single Uvicorn process; crash → Docker `restart: unless-stopped` policy
+### Worker crash
+- Gunicorn + Uvicorn workers; worker chết respawn <5s; worker khác vẫn phục vụ.
+- Dev: single Uvicorn + Docker `restart: unless-stopped`.
 
-### Memory Pressure
+### Áp lực bộ nhớ
+- Pool `pool_size=5, max_overflow=10`; body limit 1MB; pagination mặc định 50, tối đa 100.
+- Container memory limit (cấu hình Compose).
 
-- SQLAlchemy connection pool limits: `pool_size=5, max_overflow=10`
-- Request body limit: 1MB (Nginx `client_max_body_size`)
-- Response pagination: default 50 items, max 100 items — prevents OOM on large todo sets
-- Container memory limit: 512MB (configurable via Docker Compose)
-
-### File System Issues (SQLite)
-
-- SQLite file on a Docker named volume (not ephemeral container layer)
-- WAL mode: corruption recovery via `PRAGMA integrity_check`
-- Backup: daily `cp app.db app.db.backup` via cron container
-- Runbook: `docs/operations/runbook.md` covers recovery procedure
+### ⭐ Lỗi liên quan dữ liệu nhạy cảm / audit
+- **Audit store append-only**: nếu ghi audit thất bại khi đọc dữ liệu nhạy cảm → **fail-closed** (từ chối đọc) để giữ CP-3, không phục vụ dữ liệu mà không audit.
+- Khóa `FIELD_ENCRYPTION_KEY` lưu qua secret; mất khóa = mất khả năng giải mã ⇒ backup khóa theo quy trình riêng (xem runbook).
 
 ---
 
 ## Graceful Shutdown
-
 ```python
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    await database.connect()
-    logger.info("event", event="startup.complete")
-    
-    yield  # App runs here
-    
-    # Shutdown (triggered by SIGTERM)
+    await database.connect(); logger.info("event", event="startup.complete")
+    yield
     logger.info("event", event="shutdown.begin")
-    await database.disconnect()    # Close all DB connections
-    logger.info("event", event="shutdown.complete")
+    await database.disconnect(); logger.info("event", event="shutdown.complete")
 ```
-
-Nginx `proxy_read_timeout 300s` ensures no in-flight requests are dropped during a 60-second rolling restart window.
-
-Docker Compose `stop_grace_period: 30s` gives the backend 30s to finish in-flight requests before SIGKILL.
+Nginx `proxy_read_timeout 300s`; Compose `stop_grace_period: 30s` cho request đang xử lý hoàn tất trước SIGKILL (NFR-18, CP không bị vi phạm giữa chừng).
 
 ---
 
-## Database Abstraction Layer
+## Lớp trừu tượng CSDL (Ports & Adapters)
 
-### The Port Interface
-
+### Port interface (ví dụ Assessment)
 ```python
-# app/todos/repository.py (Port — abstract interface)
-class ITodoRepository(Protocol):
-    async def create(self, user_id: UUID, data: TodoCreate) -> Todo: ...
-    async def get(self, todo_id: UUID, user_id: UUID) -> Todo | None: ...
-    async def list(self, user_id: UUID, filters: TodoFilters) -> PaginatedResult[Todo]: ...
-    async def update(self, todo_id: UUID, user_id: UUID, data: TodoUpdate) -> Todo | None: ...
-    async def soft_delete(self, todo_id: UUID, user_id: UUID) -> bool: ...
-    async def restore(self, todo_id: UUID, user_id: UUID) -> bool: ...
-    async def reorder(self, user_id: UUID, orders: list[TodoOrder]) -> bool: ...
+class IAssessmentRepository(Protocol):
+    async def save_result(self, user_id: UUID, instrument_id: UUID, payload: bytes) -> AssessmentResult: ...
+    async def get_result(self, result_id: UUID, owner_id: UUID) -> AssessmentResult | None: ...
+    async def list_results(self, user_id: UUID) -> list[AssessmentResult]: ...
+    async def delete_result(self, result_id: UUID, owner_id: UUID) -> bool: ...
+```
+Các Port khác: `IUserRepo`, `IConsentRepo`, `ICompetencyRepo`, `ICareerRepo`, `IRecoRepo`, `IAuditRepo`.
+
+### Adapter hiện tại: SQLite qua SQLAlchemy
+```python
+class SQLAlchemyAssessmentRepository:
+    async def get_result(self, result_id, owner_id):
+        row = (await self._session.execute(
+            select(AssessmentResultModel)
+            .where(AssessmentResultModel.id == result_id)
+            .where(AssessmentResultModel.user_id == owner_id))).scalar_one_or_none()
+        return AssessmentResult.from_orm(row) if row else None
 ```
 
-### Current Adapter: SQLite via SQLAlchemy
-
-```python
-# app/todos/sql_repository.py (Adapter — SQLite)
-class SQLAlchemyTodoRepository:
-    def __init__(self, session: AsyncSession):
-        self._session = session
-    
-    async def get(self, todo_id: UUID, user_id: UUID) -> Todo | None:
-        result = await self._session.execute(
-            select(TodoModel)
-            .where(TodoModel.id == todo_id)
-            .where(TodoModel.user_id == user_id)
-            .where(TodoModel.is_deleted == False)
-        )
-        row = result.scalar_one_or_none()
-        return Todo.from_orm(row) if row else None
-```
-
-### Future Adapter: PostgreSQL (zero app code changes)
-
-To migrate to PostgreSQL:
+### Adapter tương lai: PostgreSQL (không đổi code app)
 1. `pip install asyncpg`
-2. Change `DATABASE_URL=postgresql+asyncpg://user:pass@host/db`
-3. Run `alembic upgrade head` on new DB
-4. Deploy — identical application code
+2. `DATABASE_URL=postgresql+asyncpg://user:pass@host/db`
+3. `alembic upgrade head`
+4. Deploy — code ứng dụng giữ nguyên.
+
+> Ở quy mô quốc gia, **PostgreSQL là mặc định production** (đồng thời cần cho mã hóa/audit/phân tích quy mô lớn). SQLite chỉ cho MVP/dev.
 
 ---
 
-## Caching Design Points
+## Thiết kế caching
 
-### Current (v1): No server-side cache
+### MVP: không cache server-side
+SQLite WAL đủ nhanh ở quy mô MVP. TanStack Query cache phía client (staleTime 30s) cho dữ liệu **không nhạy cảm**.
 
-At <50 concurrent users, SQLite with WAL is fast enough. Cache adds complexity and risk (stale data, invalidation bugs) that is unjustified.
+> ⛔ **Không cache kết quả trắc nghiệm/gợi ý cá nhân** (dữ liệu nhạy cảm) — không lưu lâu ở client, không đưa vào cache dùng chung. Mỗi lần đọc phải qua audit (CP-3).
 
-TanStack Query provides client-side caching:
-- `staleTime: 30000` (30s) — data considered fresh for 30s; no refetch
-- `cacheTime: 300000` (5min) — cache retained for 5min after last subscriber
-- Window focus triggers background refetch
-
-### Phase 3: Server-side cache (Redis)
-
-When we migrate to PostgreSQL + multi-node:
-
+### Giai đoạn sau: cache server-side (Redis) cho dữ liệu CÔNG KHAI
 ```
-Request → Redis Cache (5min TTL) → PostgreSQL
-              ↑
-         Invalidated on any mutation
+Request → Redis (TTL) → PostgreSQL   (chỉ cho dữ liệu không nhạy cảm)
 ```
+Cache keys an toàn để cache:
+- `career:list:{filter_hash}` → thư viện nghề (đổi hiếm)
+- `career:single:{id}`, `content:{dieu5}:{phase}:{level}` → nội dung nghề/bài học
+- `competency:tree` → cây 12 năng lực (gần như tĩnh)
 
-Cache keys:
-- `todo:list:{user_id}:{filter_hash}` → paginated list results
-- `todo:single:{todo_id}` → individual todo (invalidated on update)
-- `tag:list:{user_id}` → tag list (rarely changes)
+**Không cache:** `assessment_result:*`, `recommendation:*`, hồ sơ cá nhân trẻ — dữ liệu nhạy cảm.
 
-**The ITodoRepository interface accommodates caching as a decorator:**
+Decorator caching áp cho repo dữ liệu công khai:
 ```python
-class CachingTodoRepository:
-    def __init__(self, inner: ITodoRepository, cache: Redis):
-        self._inner = inner
-        self._cache = cache
-    
-    async def list(self, user_id: UUID, filters: TodoFilters) -> PaginatedResult[Todo]:
-        key = f"todo:list:{user_id}:{hash(filters)}"
-        cached = await self._cache.get(key)
-        if cached:
-            return deserialize(cached)
-        result = await self._inner.list(user_id, filters)
-        await self._cache.setex(key, 300, serialize(result))
+class CachingCareerRepository:
+    async def list(self, filters):
+        key = f"career:list:{hash(filters)}"
+        if (c := await self._cache.get(key)): return deserialize(c)
+        res = await self._inner.list(filters)
+        await self._cache.setex(key, 300, serialize(res)); return res
+```
+
+---
+
+## Điểm mở rộng async/event-driven
+```python
+class AssessmentService:
+    async def submit(self, ...) -> AssessmentResult:
+        result = await self.repo.save_result(...)
+        await self.event_bus.publish(AssessmentSubmitted(user_id=..., instrument="riasec"))
         return result
 ```
-
----
-
-## Async/Event-Driven Extension Points
-
-The service layer emits domain events that can be consumed by subscribers in future:
-
-```python
-# Current: synchronous, no events
-class TodoService:
-    async def create_todo(self, ...) -> Todo:
-        todo = await self.repo.create(...)
-        # TODO: publish TodoCreated event (v2)
-        return todo
-
-# Future: event mesh
-class TodoService:
-    async def create_todo(self, ...) -> Todo:
-        todo = await self.repo.create(...)
-        await self.event_bus.publish(TodoCreated(todo_id=todo.id, user_id=todo.user_id))
-        return todo
-```
-
-The event bus is injected via dependency injection — swappable between:
-- `InMemoryEventBus` (tests, v1)
-- `RedisEventBus` (Phase 3)
-- `KafkaEventBus` (Phase 4, high-throughput)
+Event bus tiêm qua DI: `InMemoryEventBus` (MVP/test) → `RedisEventBus` (mở rộng) → `KafkaEventBus` (quy mô lớn, vd đồng bộ CSDL quốc gia GD&ĐT).
+> Sự kiện **không mang nội dung nhạy cảm** trong payload (chỉ id/loại) để tránh rò rỉ qua hạ tầng message.
 
 ---
 
 ## Retry Strategy
-
-### Backend: Database Operations
-
 ```python
-@retry(
-    retry=retry_if_exception_type(OperationalError),
-    wait=wait_exponential(multiplier=0.1, max=1),
-    stop=stop_after_attempt(3),
-    before_sleep=log_retry_attempt,
-)
-async def execute_with_retry(session, query):
-    return await session.execute(query)
+@retry(retry=retry_if_exception_type(OperationalError),
+       wait=wait_exponential(multiplier=0.1, max=1), stop=stop_after_attempt(3))
+async def execute_with_retry(session, query): return await session.execute(query)
 ```
+Chỉ retry lỗi tạm thời (lock/timeout). **Không** retry: constraint violation, auth/consent failures, lỗi ghi audit (fail-closed).
 
-Only retry on transient errors (lock contention, timeout). Never retry on:
-- Constraint violations (4xx — business logic error)
-- Auth failures
-
-### Frontend: API Requests
-
-TanStack Query mutation retry:
-```typescript
-const createTodo = useMutation({
-  mutationFn: apiClient.todos.create,
-  retry: 1,                    // One retry on network error
-  retryDelay: 1000,           // 1 second between retries
-  onError: showErrorToast,    // After retry exhausted
-})
-```
-
-Axios interceptor: auto-retry on 401 (after token refresh). Does NOT retry on 4xx (business errors).
+Frontend: TanStack Query mutation `retry: 1`; Axios interceptor auto-retry sau refresh 401; không retry 4xx nghiệp vụ.
 
 ---
 
 ## Backup & Recovery
+| Thành phần | Chiến lược | RPO | RTO |
+|---|---|---|---|
+| DB (SQLite→Postgres) | Daily backup + weekly off-site; Postgres: WAL archiving/PITR | 24h→gần 0 | 30min |
+| **Audit store** | Backup riêng, **append-only/immutable**; không sửa/xóa | gần 0 | 30min |
+| **FIELD_ENCRYPTION_KEY** | Lưu trữ an toàn riêng (HSM/secret manager); versioned theo key id | 0 | 10min |
+| Docker images | GHCR (immutable) | 0 | 5min |
+| Secrets/Config | Secret manager / git | 0 | 5–10min |
 
-| Component | Backup Strategy | RPO | RTO |
-|-----------|----------------|-----|-----|
-| SQLite DB | Daily cp to backup volume + weekly off-site | 24h | 30min |
-| Docker images | Pushed to GHCR (immutable) | 0 (rebuild from git) | 5min |
-| Secrets | Stored in secure notes + team password manager | 0 (rotate on recovery) | 10min |
-| Config | In git repository | 0 (git history) | 5min |
+> ⚠️ Phục hồi DB nhưng **mất `FIELD_ENCRYPTION_KEY`** = không giải mã được kết quả nhạy cảm. Khóa và DB phải có chiến lược backup **độc lập nhưng đồng bộ phiên bản**. Quy trình chi tiết: [`docs/operations/runbook.md`](../operations/runbook.md).
 
-See `docs/operations/runbook.md` for step-by-step recovery procedures.
+---
+
+## Lộ trình mở rộng theo segment người dùng
+| Giai đoạn | Người dùng | Hạ tầng |
+|---|---|---|
+| MVP | THCS + THPT (1 trường/cụm thí điểm) | Single-node SQLite |
+| 2 | + Tiểu học; nhiều trường | Multi-worker; PostgreSQL |
+| 3 | + người đi làm; cấp Sở/quốc gia | LB → API (×N) → Postgres (primary+replica) → Redis (cache công khai); adapter CSDL quốc gia GD&ĐT |

@@ -342,7 +342,7 @@ jobs:
 
       # Build backend
       - name: Build backend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: backend
           target: production
@@ -354,7 +354,7 @@ jobs:
 
       # Build frontend
       - name: Build frontend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: frontend
           target: production

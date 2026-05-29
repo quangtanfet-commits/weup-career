@@ -44,6 +44,25 @@ async def create_recommendation(
     return RecommendationOut.from_model(reco)
 
 
+@router.get(
+    "/recommendations/{reco_id}",
+    response_model=RecommendationOut,
+)
+async def read_recommendation(
+    reco_id: str = Path(...),
+    current: CurrentUser = Depends(get_current_user),
+    service: RecoService = Depends(reco_service),
+) -> RecommendationOut:
+    """Read a recommendation the caller is authorised for (G-6, CP-4).
+
+    Owner OR verified guardian OR assigned counselor of the owner; any other
+    relation → 404 (existence-hiding). The recommendation ``payload`` carries
+    only career/pathway ids + scores + rationale — no raw sensitive content.
+    """
+    reco = await service.get_for_actor(user_id=current.id, reco_id=reco_id)
+    return RecommendationOut.from_model(reco)
+
+
 @router.post(
     "/recommendations/{reco_id}/confirm",
     response_model=RecommendationOut,
@@ -54,5 +73,11 @@ async def confirm_recommendation(
     current: CurrentUser = Depends(get_current_user),
     service: RecoService = Depends(reco_service),
 ) -> RecommendationOut:
+    """Confirm a recommendation as an authorised human (G-6, CP-5).
+
+    The owner OR a verified guardian OR an assigned counselor may confirm;
+    ``confirmed_by`` records the actual confirming person (CP-5 — never the
+    system). Cross-relation → 404.
+    """
     reco = await service.confirm(user_id=current.id, reco_id=reco_id, decision=payload.decision)
     return RecommendationOut.from_model(reco)

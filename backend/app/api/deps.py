@@ -31,6 +31,8 @@ from app.guardians.repository import SqlGuardianRepo
 from app.guardians.service import GuardianService
 from app.reco.repository import SqlRecoRepo
 from app.reco.service import RecoService
+from app.school.repository import SqlSchoolRepo
+from app.school.service import SchoolService
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -100,6 +102,10 @@ def reco_repo(session: AsyncSession = Depends(get_session)) -> SqlRecoRepo:
     return SqlRecoRepo(session)
 
 
+def school_repo(session: AsyncSession = Depends(get_session)) -> SqlSchoolRepo:
+    return SqlSchoolRepo(session)
+
+
 def field_crypto(settings: Settings = Depends(settings_dep)) -> FieldCrypto:
     return FieldCrypto(settings.field_encryption_key)
 
@@ -158,8 +164,34 @@ def reco_service(
     recos: SqlRecoRepo = Depends(reco_repo),
     audit: SqlAuditRepo = Depends(audit_repo),
     crypto: FieldCrypto = Depends(field_crypto),
+    guardians: SqlGuardianRepo = Depends(guardian_repo),
+    schools: SqlSchoolRepo = Depends(school_repo),
 ) -> RecoService:
-    return RecoService(reco=recos, audit=audit, crypto=crypto)
+    return RecoService(
+        reco=recos,
+        audit=audit,
+        crypto=crypto,
+        guardians=guardians,
+        counselor_access=schools.has_counselor_access,
+    )
+
+
+def school_service(
+    schools: SqlSchoolRepo = Depends(school_repo),
+    guardians: SqlGuardianRepo = Depends(guardian_repo),
+    competency: CompetencyService = Depends(competency_service),
+    recos: SqlRecoRepo = Depends(reco_repo),
+    audit: SqlAuditRepo = Depends(audit_repo),
+    crypto: FieldCrypto = Depends(field_crypto),
+) -> SchoolService:
+    return SchoolService(
+        school=schools,
+        guardians=guardians,
+        competency=competency,
+        reco=recos,
+        audit=audit,
+        crypto=crypto,
+    )
 
 
 # -- auth dependencies ----------------------------------------------------

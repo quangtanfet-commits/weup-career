@@ -112,6 +112,35 @@ class Role(StrEnum):
     CONTENT_EDITOR = "content_editor"
 
 
+class SchoolRole(StrEnum):
+    """A user's role *within a school* (FR-80..83), stored on ``SchoolMembership``.
+
+    Orthogonal to ``User.user_type`` (student/working): the same person is a
+    ``student`` user_type AND has a ``student`` school role (enrollment), while a
+    teacher is a ``student``/``working`` user_type with a ``counselor`` or
+    ``school_admin`` school role scoped to one ``school_id``. The school channel
+    is DB-relational, not a JWT claim — membership is looked up per request so a
+    counselor is only ever authorised within the school they belong to (CP-4).
+    """
+
+    STUDENT = "student"
+    COUNSELOR = "counselor"
+    SCHOOL_ADMIN = "school_admin"
+
+
+class CounselingTier(StrEnum):
+    """Three-tier support model (FR-81, spec §5 CounselingSession.tier 1/2/3).
+
+    Tier 1 = universal content for all students; Tier 2 = targeted group work;
+    Tier 3 = individual counselling. Stored as the string "1"/"2"/"3" so the
+    column is a small, stable enum that is portable across SQLite/Postgres.
+    """
+
+    TIER_1 = "1"
+    TIER_2 = "2"
+    TIER_3 = "3"
+
+
 class RiasecCode(StrEnum):
     """Holland RIASEC interest types (FR-32 crosswalk assessment → careers).
 

@@ -123,6 +123,49 @@ async def seeded_careers(db: Database) -> dict[str, int]:
 
 
 @pytest_asyncio.fixture
+async def seeded_school(db: Database) -> dict[str, str]:
+    """Seed the demo school + class; return {"school": id, "class": id}."""
+    from app.school.seed import seed_schools as _seed
+
+    async with db.session_factory() as s:
+        ids = await _seed(s)
+        await s.commit()
+    return ids
+
+
+async def enroll_membership(
+    db: Database,
+    *,
+    user_id: str,
+    school_id: str,
+    role: str,
+    class_id: str | None = None,
+) -> str:
+    """Create a SchoolMembership directly (school_admin enroll flow stand-in).
+
+    Returns the membership id. Used by school-channel tests to set up the
+    relational scoping that ``counselor_check`` (CP-4) decides on.
+    """
+    from app.core.enums import SchoolRole
+    from app.core.models import new_uuid
+    from app.school.models import SchoolMembership
+
+    mid = new_uuid()
+    async with db.session_factory() as s:
+        s.add(
+            SchoolMembership(
+                id=mid,
+                user_id=user_id,
+                school_id=school_id,
+                role=SchoolRole(role),
+                class_id=class_id,
+            )
+        )
+        await s.commit()
+    return mid
+
+
+@pytest_asyncio.fixture
 async def client(settings: Settings, db: Database) -> AsyncGenerator[AsyncClient, None]:
     app = create_app(settings)
     app.state.db = db

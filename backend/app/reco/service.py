@@ -26,10 +26,12 @@ trace mirroring the ``RecommendationGovernance`` TLA+ actions.
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable, Callable
 
 from app.assessments.models import AssessmentInstrument, AssessmentResult
 from app.competency.models import Competency, LearnerProgress
 from app.core.audit import IAuditRepo
+from app.core.authz import can_access
 from app.core.crypto import FieldCrypto
 from app.core.enums import (
     Depth,
@@ -42,6 +44,7 @@ from app.core.enums import (
 from app.core.exceptions import NotFoundError, RationaleRequiredError
 from app.core.models import new_uuid
 from app.core.trace import emit as trace_emit
+from app.guardians.repository import IGuardianRepo
 from app.reco.engine import (
     CareerCandidate,
     PathwayCandidate,
@@ -66,10 +69,19 @@ class RecoService:
         reco: IRecoRepo,
         audit: IAuditRepo,
         crypto: FieldCrypto,
+        guardians: IGuardianRepo | None = None,
+        counselor_access: Callable[..., Awaitable[bool]] | None = None,
     ) -> None:
         self._reco = reco
         self._audit = audit
         self._crypto = crypto
+        # G-6 (CP-4/CP-5): relational access for read/confirm of ANOTHER user's
+        # recommendation. ``guardians`` powers the guardian↔child path;
+        # ``counselor_access`` (school repo's has_counselor_access) the
+        # counselor↔student path. Both optional so unit tests can construct a
+        # generate-only service.
+        self._guardians = guardians
+        self._counselor_access = counselor_access
 
     # -- profile assembly --------------------------------------------------
 
@@ -232,17 +244,54 @@ class RecoService:
         )
         return reco
 
+    async def _accessible_reco(self, *, actor_id: str, reco_id: str) -> Recommendation | None:
+        """Fetch a recommendation the actor may access relationally (CP-4, G-6).
+
+        The actor is allowed iff they OWN it, or are a verified guardian of, or
+        an assigned counselor of, the owner. When no relational repos were wired
+        (generate-only service), this collapses to owner-only. A recommendation
+        the actor cannot reach returns ``None`` → 404 (no existence disclosure).
+        """
+        reco = await self._reco.get_by_id(reco_id)
+        if reco is None:
+            return None
+        if reco.user_id == actor_id:
+            return reco
+        if self._guardians is None:
+            return None
+        allowed = await can_access(
+            actor_id=actor_id,
+            owner_id=reco.user_id,
+            guardian_repo=self._guardians,
+            counselor_check=self._counselor_check_adapter(),
+        )
+        return reco if allowed else None
+
+    def _counselor_check_adapter(self) -> Callable[[str, str], Awaitable[bool]] | None:
+        """Adapt the school repo's keyword hook to ``can_access``' positional one."""
+        access = self._counselor_access
+        if access is None:
+            return None
+
+        async def _check(actor_id: str, owner_id: str) -> bool:
+            return await access(counselor_id=actor_id, student_id=owner_id)
+
+        return _check
+
     async def confirm(
         self, *, user_id: str, reco_id: str, decision: RecoDecision
     ) -> Recommendation:
         """Record a HUMAN decision on a recommendation — the only path to effect (CP-5).
 
-        Ownership (CP-4) is enforced by the repo: a recommendation the caller
-        does not own is not found (→ 404), never confirmed cross-user. Sets
-        ``confirmed_by`` (the person) + ``confirmed_decision``; the system never
-        reaches this code on its own.
+        G-6 (CP-4 + CP-5): the confirmer may be the owner OR an authorised human
+        relation (verified guardian / assigned counselor). A recommendation the
+        caller has no relation to is not found (→ 404), never confirmed. CP-5 is
+        preserved: ``confirmed_by`` is set to the ACTUAL confirming human
+        (``user_id``) — still a real person, never the system — and the
+        rationale (CP-6) is untouched. The system never reaches this code on its
+        own; only an authenticated human POST does.
         """
-        reco = await self._reco.get_owned(reco_id=reco_id, user_id=user_id)
+        reco = await self._accessible_reco(actor_id=user_id, reco_id=reco_id)
         if reco is None:
             raise NotFoundError("Không tìm thấy gợi ý")
 
@@ -269,9 +318,13 @@ class RecoService:
         )
         return reco
 
-    async def get_owned(self, *, user_id: str, reco_id: str) -> Recommendation:
-        """Fetch a recommendation the caller owns, or 404 (CP-4)."""
-        reco = await self._reco.get_owned(reco_id=reco_id, user_id=user_id)
+    async def get_for_actor(self, *, user_id: str, reco_id: str) -> Recommendation:
+        """Fetch a recommendation the caller may access relationally, or 404 (G-6).
+
+        Allowed for the owner, a verified guardian, or an assigned counselor
+        (CP-4). Cross-relation → 404 (existence-hiding).
+        """
+        reco = await self._accessible_reco(actor_id=user_id, reco_id=reco_id)
         if reco is None:
             raise NotFoundError("Không tìm thấy gợi ý")
         return reco

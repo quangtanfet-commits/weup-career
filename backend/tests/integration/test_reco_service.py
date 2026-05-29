@@ -201,7 +201,7 @@ async def test_get_owned_cross_user_not_found(
 
     other = await _make_user(session, email="other@example.com")
     with pytest.raises(NotFoundError):
-        await svc.get_owned(user_id=other, reco_id=reco.id)
+        await svc.get_for_actor(user_id=other, reco_id=reco.id)
 
 
 async def test_get_owned_happy_path(session: AsyncSession, seeded_careers: dict[str, int]) -> None:
@@ -209,8 +209,54 @@ async def test_get_owned_happy_path(session: AsyncSession, seeded_careers: dict[
     svc, _, _ = _service(session)
     uid = await _make_user(session)
     reco = await svc.generate(user_id=uid)
-    fetched = await svc.get_owned(user_id=uid, reco_id=reco.id)
+    fetched = await svc.get_for_actor(user_id=uid, reco_id=reco.id)
     assert fetched.id == reco.id
+
+
+async def test_get_for_actor_guardian_path_without_counselor_hook(
+    session: AsyncSession, seeded_careers: dict[str, int]
+) -> None:
+    """G-6: with guardians wired but NO counselor hook, the guardian path works.
+
+    Builds the service with ``guardians`` set and ``counselor_access=None`` so
+    ``_counselor_check_adapter`` returns None — exercising the guardian-only
+    relational branch of ``can_access``.
+    """
+    from datetime import UTC, datetime
+
+    from app.core.enums import VerificationMethod
+    from app.guardians.models import GuardianLink
+    from app.guardians.repository import SqlGuardianRepo
+
+    crypto = FieldCrypto(make_settings().field_encryption_key)
+    audit = SqlAuditRepo(session)
+    guardians = SqlGuardianRepo(session)
+    svc = RecoService(
+        reco=SqlRecoRepo(session),
+        audit=audit,
+        crypto=crypto,
+        guardians=guardians,
+        counselor_access=None,
+    )
+    child = await _make_user(session, email="child2@example.com")
+    guardian = await _make_user(session, email="guardian2@example.com")
+    session.add(
+        GuardianLink(
+            id=new_uuid(),
+            child_user_id=child,
+            guardian_user_id=guardian,
+            relationship="mother",
+            verified_at=datetime.now(UTC),
+            verification_method=VerificationMethod.EMAIL,
+        )
+    )
+    await session.flush()
+    reco = await svc.generate(user_id=child)
+
+    fetched = await svc.get_for_actor(user_id=guardian, reco_id=reco.id)
+    assert fetched.id == reco.id
+    confirmed = await svc.confirm(user_id=guardian, reco_id=reco.id, decision=RecoDecision.ACCEPTED)
+    assert confirmed.confirmed_by == guardian  # CP-5: the real human
 
 
 async def test_repo_get_by_id(session: AsyncSession, seeded_careers: dict[str, int]) -> None:

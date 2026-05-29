@@ -110,3 +110,54 @@ class Role(StrEnum):
     COUNSELOR = "counselor"
     SCHOOL_ADMIN = "school_admin"
     CONTENT_EDITOR = "content_editor"
+
+
+class RiasecCode(StrEnum):
+    """Holland RIASEC interest types (FR-32 crosswalk assessment → careers).
+
+    Used to tag ``CareerProfile.riasec_codes`` and to filter ``GET /careers?riasec=``.
+    Letters match the RIASEC assessment scoring dimensions (assessments/scoring.py).
+    """
+
+    R = "R"  # Realistic
+    I = "I"  # Investigative  # noqa: E741 — RIASEC letter, not an ambiguous var
+    A = "A"  # Artistic
+    S = "S"  # Social
+    E = "E"  # Enterprising
+    C = "C"  # Conventional
+
+
+class PathwayType(StrEnum):
+    """Phân luồng pathway after a schooling stage (FR-31, Luật GDNN 124/2025).
+
+    ``vocational_secondary`` is the "trường trung học nghề" branch and
+    ``gdnn`` the broader giáo dục nghề nghiệp track — both are first-class
+    pathways so a career can be reached without academic university study.
+    """
+
+    ACADEMIC = "academic"
+    VOCATIONAL_SECONDARY = "vocational_secondary"
+    GDNN = "gdnn"
+    LABOR = "labor"
+
+
+class TrainingLevel(StrEnum):
+    """Trình độ đào tạo a career typically requires (filters GET /careers).
+
+    Coarse rungs spanning the GDNN ↔ academic spectrum so a learner can filter
+    careers by how much training they entail (FR-32).
+    """
+
+    SECONDARY = "secondary"
+    VOCATIONAL = "vocational"
+    COLLEGE = "college"
+    UNIVERSITY = "university"
+    POSTGRADUATE = "postgraduate"
+
+
+class ContentStatus(StrEnum):
+    """Publication state of a versioned ``ContentItem`` (FR-90, NFR-26)."""
+
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"

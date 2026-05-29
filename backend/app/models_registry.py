@@ -12,6 +12,12 @@ from app.assessments.models import (
     AssessmentResult,
 )
 from app.auth.models import RefreshToken, User
+from app.careers.models import (
+    CareerPathway,
+    CareerProfile,
+    ContentItem,
+    Pathway,
+)
 from app.competency.models import (
     Competency,
     Indicator,
@@ -28,12 +34,16 @@ __all__ = [
     "AssessmentResult",
     "AuditLog",
     "Base",
+    "CareerPathway",
+    "CareerProfile",
     "Competency",
+    "ContentItem",
     "GuardianConsent",
     "GuardianLink",
     "Indicator",
     "LearnerDomainPhase",
     "LearnerProgress",
+    "Pathway",
     "RefreshToken",
     "User",
 ]

@@ -123,6 +123,15 @@ class AuthService:
             )
             raise InvalidCredentialsError()
 
+        # A soft-deleted account cannot authenticate (FR-91/92). Surfaced as
+        # InvalidCredentials (401) so the deletion is not disclosed; the account
+        # stays unauthenticable until purged (or recovered, future).
+        if user.is_deleted or user.account_status == AccountStatus.DELETED:
+            await self._audit.record(
+                action="auth.login.rejected_deleted", actor_id=user.id, target_type="User"
+            )
+            raise InvalidCredentialsError()
+
         tokens = await self._issue_session(user, user_agent=user_agent, ip_address=ip_address)
         await self._audit.record(
             action="auth.login.succeeded", actor_id=user.id, target_type="User"
@@ -167,6 +176,10 @@ class AuthService:
 
         user = await self._users.get_by_id(stored.user_id)
         if user is None:
+            raise TokenError()
+        # A soft-deleted account cannot refresh into a new session (FR-91/92).
+        if user.is_deleted or user.account_status == AccountStatus.DELETED:
+            await self._tokens.revoke(stored, when=now)
             raise TokenError()
 
         # Atomic rotation: revoke old, mint new — same unit of work (CP-7).

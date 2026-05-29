@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Response, status
 
+from app.account.router import router as account_router
 from app.api.deps import get_db
 from app.assessments.router import router as assessment_router
 from app.auth.router import router as auth_router
@@ -27,6 +28,7 @@ api_router.include_router(career_router)
 api_router.include_router(reco_router)
 api_router.include_router(school_router)
 api_router.include_router(wellbeing_router)
+api_router.include_router(account_router)
 
 
 @api_router.get("/health", tags=["ops"])

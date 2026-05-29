@@ -1,6 +1,29 @@
 {
   "runs": [
     {
+      "scope": "slice-7 (wellbeing.feature)",
+      "timestamp": "2026-05-30T01:30:00Z",
+      "artifact": "backend/ @ feat/slice7-admin-content-wellbeing (01676f4) — in-process ASGI (real app/DB/seeders)",
+      "tainted": false,
+      "holdout_integrity": "coder đọc spec.md + auth-design.md + ADR, KHÔNG đọc scenarios/ (đặc biệt wellbeing.feature) — chỉ thị + git xác nhận",
+      "checks": {
+        "W1_nl4_dieu5b_content": {"score": 95, "evidence": "GET /content?dieu5_code=b&competency_code=NL4 → 3 nội dung (Quản lý căng thẳng / [CRED_C9A0A3DD] / [CRED_5C9DB1A6] biết khi cần hỗ trợ), gắn NL4 + dieu5='b'."},
+        "W2_safe_pathway_tier3_no_diagnosis": {"score": 95, "evidence": "POST /wellbeing/support-request → 201; route tới counselor Tier-3 cùng trường (null graceful khi không có); response KHÔNG chứa diagnos/risk/score/severity/clinical/symptom (NG-03)."},
+        "W3_complete_activity_nl4_progress": {"score": 65, "evidence": "Content NL4 tồn tại + NL4 progress ghi được qua /me/progress/indicators; auto-link 'hoàn thành hoạt động → learner_progress NL4=K' chưa nối — CÙNG G-4 (FR-22)."},
+        "W4_age_stratified_by_school_level": {"score": 78, "evidence": "ContentItem.school_level + filter GET /content?school_level=... chạy. Seed wellbeing: lower_secondary ×2 + upper_secondary ×1. Primary chưa seed (đúng MVP THCS/THPT trước — project-mvp-decisions)."},
+        "W5_no_medical_data_stored": {"score": 92, "evidence": "SupportRequest model chỉ student_id/counselor_id(nullable)/tier=3/message(lời học sinh)/status/created_at — KHÔNG diagnosis/risk/score/clinical. Không lưu hồ sơ y tế."}
+      },
+      "verify_note": "Static gates sạch (ruff+format+mypy+bandit). Coverage: wellbeing/careers/school = 100%, global 99%. Full suite 329 passed (lần 2). Lần 1 có 1 'error' transient ở SETUP test_assessment_api::test_submit_requires_auth (slice-2 pre-existing) = event-loop/StaticPool teardown flake dưới tải; cô lập file = 19 passed sạch, chạy lại full = 329 sạch. KHÔNG phải regression slice-7. G-7 admin CRUD (own 201/cross 404/non-admin 404), content versioning (missing tag 422, non-editor 403, publish v3→v2 archived, listing chỉ latest published) đều verified live.",
+      "aggregate": 85.0,
+      "scenarios_below_60": 0,
+      "verdict": "ship — wellbeing W1/W2/W5 92-95, W4 78 (primary seed ngoài MVP), W3 65 (G-4 auto-link, tracked). G-5 + G-7 CLOSED (verified live).",
+      "gaps": {
+        "G-5": "CLOSED: content_editor versioning — publish v(n+1) published + v(n) archived (traceable), GET /content chỉ hiện latest published. Verified: publish v3 → v2 archived.",
+        "G-7": "CLOSED: school_admin write CRUD (POST /school/{id}/classes, /members) school-scoped; cross-school + non-admin → 404. Verified live.",
+        "G-4": "OPEN (vẫn): auto-link hoàn thành content (5c/[CRED_27FFA9DB]) → learner_progress (FR-22). Hiện ghi thủ công qua /me/progress/indicators."
+      }
+    },
+    {
       "scope": "slice-6 (counseling-rbac.feature)",
       "timestamp": "2026-05-29T23:30:00Z",
       "artifact": "backend/ @ feat/slice6-school-counseling (0fddde9 + format fix) — in-process ASGI (real app/DB/authz/audit/crypto) + Gate A TLA",

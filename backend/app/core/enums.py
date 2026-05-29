@@ -192,6 +192,20 @@ class ContentStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+class SupportRequestStatus(StrEnum):
+    """Coarse routing status of a wellbeing ``SupportRequest`` (FR-71).
+
+    Deliberately NON-clinical: it tracks the referral's routing lifecycle, never
+    any health/risk state (NG-03). ``open`` = recorded & (if possible) routed to
+    a counselor; ``acknowledged`` = a counselor has picked it up; ``closed`` =
+    the referral is no longer active. No diagnosis or severity is ever stored.
+    """
+
+    OPEN = "open"
+    ACKNOWLEDGED = "acknowledged"
+    CLOSED = "closed"
+
+
 class RecoDecision(StrEnum):
     """Human decision recorded on a ``Recommendation`` (CP-5, ADR-012).
 

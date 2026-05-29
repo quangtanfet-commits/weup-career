@@ -15,6 +15,7 @@ from app.core.database import Database
 from app.guardians.router import router as guardian_router
 from app.reco.router import router as reco_router
 from app.school.router import router as school_router
+from app.wellbeing.router import router as wellbeing_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -25,6 +26,7 @@ api_router.include_router(competency_router)
 api_router.include_router(career_router)
 api_router.include_router(reco_router)
 api_router.include_router(school_router)
+api_router.include_router(wellbeing_router)
 
 
 @api_router.get("/health", tags=["ops"])

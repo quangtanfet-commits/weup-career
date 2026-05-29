@@ -123,6 +123,17 @@ async def seeded_careers(db: Database) -> dict[str, int]:
 
 
 @pytest_asyncio.fixture
+async def seeded_wellbeing(db: Database) -> dict[str, int]:
+    """Seed NL4 / [TOKEN_2dc34b67890fa1e5] wellbeing content; return the seed counts."""
+    from app.wellbeing.seed import seed_wellbeing as _seed
+
+    async with db.session_factory() as s:
+        counts = await _seed(s)
+        await s.commit()
+    return counts
+
+
+@pytest_asyncio.fixture
 async def seeded_school(db: Database) -> dict[str, str]:
     """Seed the demo school + class; return {"school": id, "class": id}."""
     from app.school.seed import seed_schools as _seed
@@ -163,6 +174,22 @@ async def enroll_membership(
         )
         await s.commit()
     return mid
+
+
+async def grant_content_editor(db: Database, *, user_id: str) -> None:
+    """Flip ``User.is_content_editor`` on (operator/seed grant stand-in).
+
+    Used by content-editor tests; the user must re-login afterwards so the new
+    JWT carries the ``content_editor`` role (the route still re-derives from the
+    DB flag, so this also covers the stale-claim path).
+    """
+    from app.auth.models import User
+
+    async with db.session_factory() as s:
+        user = await s.get(User, user_id)
+        assert user is not None
+        user.is_content_editor = True
+        await s.commit()
 
 
 @pytest_asyncio.fixture

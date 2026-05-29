@@ -46,6 +46,9 @@ class ICareerRepo(Protocol):
         school_level: SchoolLevel | None = None,
         status: ContentStatus | None = None,
     ) -> list[ContentItem]: ...
+    async def add_content(self, item: ContentItem) -> ContentItem: ...
+    async def get_content(self, content_id: str) -> ContentItem | None: ...
+    async def latest_published_version(self, content_id: str) -> ContentItem | None: ...
 
 
 class SqlCareerRepo:
@@ -108,3 +111,30 @@ class SqlCareerRepo:
             stmt = stmt.where(ContentItem.status == status)
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
+
+    async def add_content(self, item: ContentItem) -> ContentItem:
+        self._session.add(item)
+        await self._session.flush()
+        return item
+
+    async def get_content(self, content_id: str) -> ContentItem | None:
+        return await self._session.get(ContentItem, content_id)
+
+    async def latest_published_version(self, content_id: str) -> ContentItem | None:
+        """The currently-published row in ``content_id``'s lineage, if any.
+
+        ``content_id`` may be any version row in the lineage. A row's lineage is
+        ``lineage_id`` when set, else its own id (legacy/seed rows). Returns the
+        single published version in that lineage (the row a new publish archives),
+        or ``None`` if none is published.
+        """
+        anchor = await self._session.get(ContentItem, content_id)
+        if anchor is None:
+            return None
+        lineage = anchor.lineage_id or anchor.id
+        stmt = select(ContentItem).where(
+            ((ContentItem.lineage_id == lineage) | (ContentItem.id == lineage)),
+            ContentItem.status == ContentStatus.PUBLISHED,
+        )
+        result = await self._session.execute(stmt)
+        return result.scalars().first()

@@ -31,11 +31,20 @@ class ISchoolRepo(Protocol):
     async def add_school(self, school: School) -> School: ...
     async def add_class(self, klass: SchoolClass) -> SchoolClass: ...
     async def add_session(self, session: CounselingSession) -> CounselingSession: ...
+    async def add_membership(self, membership: SchoolMembership) -> SchoolMembership: ...
     async def staff_membership(
         self, *, user_id: str, school_id: str
     ) -> SchoolMembership | None: ...
+    async def admin_membership(
+        self, *, user_id: str, school_id: str
+    ) -> SchoolMembership | None: ...
+    async def get_membership(
+        self, *, user_id: str, school_id: str, role: SchoolRole
+    ) -> SchoolMembership | None: ...
     async def has_counselor_access(self, *, counselor_id: str, student_id: str) -> bool: ...
     async def list_students(self, *, school_id: str) -> list[tuple[User, SchoolMembership]]: ...
+    async def list_classes(self, *, school_id: str) -> list[SchoolClass]: ...
+    async def find_counselor_for_student(self, *, student_id: str) -> str | None: ...
 
 
 class SqlSchoolRepo:
@@ -56,6 +65,44 @@ class SqlSchoolRepo:
         self._session.add(session)
         await self._session.flush()
         return session
+
+    async def add_membership(self, membership: SchoolMembership) -> SchoolMembership:
+        self._session.add(membership)
+        await self._session.flush()
+        return membership
+
+    async def admin_membership(self, *, user_id: str, school_id: str) -> SchoolMembership | None:
+        """A ``school_admin`` membership for this user in this school, else None.
+
+        This is the authority gate for the school-admin write CRUD (FR-80): only
+        a school_admin OF THIS school may create classes / [CRED_3D71BA7E] members.
+        Re-derived from ``SchoolMembership`` per request — never from the JWT.
+        """
+        result = await self._session.execute(
+            select(SchoolMembership).where(
+                SchoolMembership.user_id == user_id,
+                SchoolMembership.school_id == school_id,
+                SchoolMembership.role == SchoolRole.SCHOOL_ADMIN,
+            )
+        )
+        return result.scalars().first()
+
+    async def get_membership(
+        self, *, user_id: str, school_id: str, role: SchoolRole
+    ) -> SchoolMembership | None:
+        """An existing membership for the exact (user, school, role) tuple.
+
+        Used to make enrollment idempotent against the
+        ``uq_membership_user_school_role`` constraint.
+        """
+        result = await self._session.execute(
+            select(SchoolMembership).where(
+                SchoolMembership.user_id == user_id,
+                SchoolMembership.school_id == school_id,
+                SchoolMembership.role == role,
+            )
+        )
+        return result.scalars().first()
 
     async def staff_membership(self, *, user_id: str, school_id: str) -> SchoolMembership | None:
         """A counselor OR school_admin membership for this user in this school.
@@ -119,3 +166,40 @@ class SqlSchoolRepo:
         )
         result = await self._session.execute(stmt)
         return [(row[0], row[1]) for row in result.all()]
+
+    async def list_classes(self, *, school_id: str) -> list[SchoolClass]:
+        """All classes of one school (FR-80), scoped to ``school_id``."""
+        stmt = (
+            select(SchoolClass).where(SchoolClass.school_id == school_id).order_by(SchoolClass.name)
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def find_counselor_for_student(self, *, student_id: str) -> str | None:
+        """A counselor user_id in the SAME school as ``student_id`` (FR-71).
+
+        Joins the student's student-enrollment membership to a counselor
+        membership on ``school_id`` (and on ``class_id`` when the counselor is
+        class-scoped — same scoping rule as ``has_counselor_access``). Returns
+        the first matching counselor's ``user_id``, or ``None`` if the student
+        has no school or no counselor — the referral is then recorded unrouted.
+        """
+        student = aliased(SchoolMembership)
+        counselor = aliased(SchoolMembership)
+        stmt = (
+            select(counselor.user_id)
+            .join(
+                student,
+                (counselor.school_id == student.school_id)
+                & ((counselor.class_id.is_(None)) | (counselor.class_id == student.class_id)),
+            )
+            .where(
+                student.user_id == student_id,
+                student.role == SchoolRole.STUDENT,
+                counselor.role == SchoolRole.COUNSELOR,
+            )
+            .order_by(counselor.user_id)
+            .limit(1)
+        )
+        result = await self._session.execute(stmt)
+        return result.scalars().first()

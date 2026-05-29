@@ -34,6 +34,7 @@ from app.school.models import (
     SchoolClass,
     SchoolMembership,
 )
+from app.wellbeing.models import SupportRequest
 
 __all__ = [
     "AssessmentInstrument",
@@ -57,5 +58,6 @@ __all__ = [
     "School",
     "SchoolClass",
     "SchoolMembership",
+    "SupportRequest",
     "User",
 ]

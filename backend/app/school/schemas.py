@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from app.core.enums import CompetencyArea, CounselingTier, Depth, DevPhase
+from app.core.enums import CompetencyArea, CounselingTier, Depth, DevPhase, SchoolRole
+from app.school.models import SchoolClass
 from app.school.service import (
     DesensitizedAssessment,
     RosterEntry,
@@ -26,6 +27,45 @@ class RosterEntryOut(BaseModel):
     @classmethod
     def from_entry(cls, e: RosterEntry) -> RosterEntryOut:
         return cls(user_id=e.user_id, email=e.email, class_id=e.class_id)
+
+
+class CreateClassRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    grade: str = Field(default="", max_length=16)
+
+
+class SchoolClassOut(BaseModel):
+    id: str
+    school_id: str
+    name: str
+    grade: str
+
+    @classmethod
+    def from_model(cls, k: SchoolClass) -> SchoolClassOut:
+        return cls(id=k.id, school_id=k.school_id, name=k.name, grade=k.grade)
+
+
+class AssignMemberRequest(BaseModel):
+    """Enroll/assign a user as student or counselor in a school (FR-80).
+
+    ``role`` is constrained to the assignable school roles; the service rejects
+    anything else. ``class_id`` is optional class scoping.
+    """
+
+    user_id: str = Field(min_length=1)
+    role: SchoolRole
+    class_id: str | None = None
+
+
+class MembershipOut(BaseModel):
+    id: str
+    user_id: str
+    school_id: str
+    role: SchoolRole
+    class_id: str | None
+    # True if this call created the membership; False if it already existed
+    # (idempotent re-assign).
+    created: bool
 
 
 class CreateSessionRequest(BaseModel):

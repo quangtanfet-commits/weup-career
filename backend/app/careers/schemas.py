@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.careers.models import CareerProfile, ContentItem, Pathway
+from app.careers.service import ContentDraft
 from app.core.enums import (
     ContentStatus,
     Depth,
@@ -111,4 +112,34 @@ class ContentItemOut(BaseModel):
             version=c.version,
             status=c.status,
             source_ref=c.source_ref,
+        )
+
+
+class CreateContentRequest(BaseModel):
+    """Editor payload for ``POST /content`` (FR-90).
+
+    All five tags are mandatory and non-optional here — Pydantic rejects a
+    missing field with 422 before the service runs. ``depth``/``dev_phase``/
+    ``school_level`` are typed enums so an invalid value is also a 422.
+    """
+
+    title: str = Field(min_length=1, max_length=255)
+    body: str = Field(default="", max_length=20000)
+    competency_code: str = Field(min_length=1, max_length=16)
+    dieu5_code: str = Field(min_length=1, max_length=8)
+    depth: Depth
+    dev_phase: DevPhase
+    school_level: SchoolLevel
+    source_ref: str = Field(default="", max_length=255)
+
+    def to_draft(self) -> ContentDraft:
+        return ContentDraft(
+            title=self.title,
+            body=self.body,
+            competency_code=self.competency_code,
+            dieu5_code=self.dieu5_code,
+            depth=self.depth,
+            dev_phase=self.dev_phase,
+            school_level=self.school_level,
+            source_ref=self.source_ref,
         )

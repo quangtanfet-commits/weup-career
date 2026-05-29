@@ -69,6 +69,38 @@ async def audit(session: AsyncSession) -> SqlAuditRepo:
 
 
 @pytest_asyncio.fixture
+async def seeded_instruments(db: Database) -> dict[str, str]:
+    """Seed one active instrument per type; return {type_value: instrument_id}."""
+    from app.assessments.models import AssessmentInstrument, AssessmentItem
+    from app.assessments.seed import INSTRUMENT_VERSION, ITEMS_BY_TYPE
+    from app.core.enums import InstrumentType
+    from app.core.models import new_uuid
+
+    ids: dict[str, str] = {}
+    async with db.session_factory() as s:
+        for itype in InstrumentType:
+            inst = AssessmentInstrument(
+                id=new_uuid(), type=itype, version=INSTRUMENT_VERSION, is_active=True
+            )
+            s.add(inst)
+            await s.flush()
+            for key in ITEMS_BY_TYPE[itype]:
+                s.add(
+                    AssessmentItem(
+                        id=new_uuid(),
+                        instrument_id=inst.id,
+                        item_key=key,
+                        competency_code="NL1",
+                        dieu5_code="b",
+                        prompt_vi=ITEMS_BY_TYPE[itype][key],
+                    )
+                )
+            ids[itype.value] = inst.id
+        await s.commit()
+    return ids
+
+
+@pytest_asyncio.fixture
 async def client(
     settings: Settings, db: Database
 ) -> AsyncGenerator[AsyncClient, None]:

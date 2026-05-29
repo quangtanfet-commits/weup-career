@@ -43,6 +43,12 @@ class AssuranceLevel(StrEnum):
     HIGH = "high"
 
 
+class InstrumentType(StrEnum):
+    RIASEC = "riasec"
+    VIPS = "vips"
+    MBTI = "mbti"
+
+
 class ConsentStatus(StrEnum):
     ACTIVE = "active"
     REVOKED = "revoked"

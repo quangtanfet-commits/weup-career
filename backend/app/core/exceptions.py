@@ -86,3 +86,14 @@ class SelfConsentError(AppError):
     status_code = 403
     code = "SELF_CONSENT_FORBIDDEN"
     message = "Không thể tự đóng vai người giám hộ cho chính mình"
+
+
+class AssuranceTooLowError(AppError):
+    """FF-19: under-16 sensitive data needs a minimum guardian-link assurance."""
+
+    status_code = 403
+    code = "ASSURANCE_LEVEL_TOO_LOW"
+    message = (
+        "Mức xác thực người giám hộ chưa đủ để xử lý dữ liệu nhạy cảm "
+        "của người dùng dưới 16 tuổi"
+    )

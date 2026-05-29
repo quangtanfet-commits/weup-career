@@ -6,12 +6,20 @@ importing it here (single source of truth for the mapped registry).
 
 from __future__ import annotations
 
+from app.assessments.models import (
+    AssessmentInstrument,
+    AssessmentItem,
+    AssessmentResult,
+)
 from app.auth.models import RefreshToken, User
 from app.core.audit_models import AuditLog
 from app.core.database import Base
 from app.guardians.models import GuardianConsent, GuardianLink
 
 __all__ = [
+    "AssessmentInstrument",
+    "AssessmentItem",
+    "AssessmentResult",
     "AuditLog",
     "Base",
     "GuardianConsent",

@@ -56,6 +56,9 @@ ignore = [
 # S105/S106/S107: literal "token_type"/test passwords flagged as hardcoded secrets.
 "app/auth/schemas.py" = ["S105"]
 "tests/**" = ["S105", "S106", "S107", "S311"]
+# Bias-metric test filenames are mandated verbatim by docs/testing/bias-testing.md
+# (e.g. test_M1_scoring_invariance.py); keep the spec-aligned uppercase metric id.
+"tests/bias/test_M1_scoring_invariance.py" = ["N999"]
 "migrations/**" = ["E501"]
 
 [tool.mypy]

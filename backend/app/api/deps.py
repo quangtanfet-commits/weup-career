@@ -12,11 +12,14 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.assessments.repository import SqlAssessmentRepo
+from app.assessments.service import AssessmentService
 from app.auth.repository import SqlRefreshTokenRepo, SqlUserRepo
 from app.auth.service import AuthService
 from app.core.audit import SqlAuditRepo
 from app.core.config import Settings, get_settings
 from app.core.consent import require_consent
+from app.core.crypto import FieldCrypto
 from app.core.database import Database
 from app.core.exceptions import AuthenticationError
 from app.core.security import decode_access_token
@@ -75,6 +78,14 @@ def audit_repo(session: AsyncSession = Depends(get_session)) -> SqlAuditRepo:
     return SqlAuditRepo(session)
 
 
+def assessment_repo(session: AsyncSession = Depends(get_session)) -> SqlAssessmentRepo:
+    return SqlAssessmentRepo(session)
+
+
+def field_crypto(settings: Settings = Depends(settings_dep)) -> FieldCrypto:
+    return FieldCrypto(settings.field_encryption_key)
+
+
 # -- services -------------------------------------------------------------
 
 
@@ -93,6 +104,22 @@ def guardian_service(
     audit: SqlAuditRepo = Depends(audit_repo),
 ) -> GuardianService:
     return GuardianService(users=users, guardians=guardians, audit=audit)
+
+
+def assessment_service(
+    settings: Settings = Depends(settings_dep),
+    assessments: SqlAssessmentRepo = Depends(assessment_repo),
+    guardians: SqlGuardianRepo = Depends(guardian_repo),
+    audit: SqlAuditRepo = Depends(audit_repo),
+    crypto: FieldCrypto = Depends(field_crypto),
+) -> AssessmentService:
+    return AssessmentService(
+        settings=settings,
+        assessments=assessments,
+        guardians=guardians,
+        audit=audit,
+        crypto=crypto,
+    )
 
 
 # -- auth dependencies ----------------------------------------------------

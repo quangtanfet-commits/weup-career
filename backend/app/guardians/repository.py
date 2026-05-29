@@ -8,7 +8,7 @@ from typing import Protocol
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.enums import ConsentStatus
+from app.core.enums import AssuranceLevel, ConsentStatus
 from app.guardians.models import GuardianConsent, GuardianLink
 
 
@@ -21,6 +21,7 @@ class IGuardianRepo(Protocol):
     async def add_consent(self, consent: GuardianConsent) -> GuardianConsent: ...
     async def get_active_consent(self, child_user_id: str) -> GuardianConsent | None: ...
     async def has_active_consent(self, child_user_id: str) -> bool: ...
+    async def best_assurance_for_child(self, child_user_id: str) -> AssuranceLevel | None: ...
     async def revoke_consent(
         self, consent: GuardianConsent, *, when: datetime
     ) -> None: ...
@@ -65,6 +66,25 @@ class SqlGuardianRepo:
 
     async def has_active_consent(self, child_user_id: str) -> bool:
         return (await self.get_active_consent(child_user_id)) is not None
+
+    async def best_assurance_for_child(self, child_user_id: str) -> AssuranceLevel | None:
+        """Assurance of the guardian link backing the child's active consent.
+
+        Returns ``None`` when there is no active consent (FF-19 gate then sees
+        the absence and applies the configured minimum). Joins the active
+        consent to its originating link so the assurance reflects the actual
+        consent in force, not any stale/[CRED_3CD0C8A1] link.
+        """
+        result = await self._session.execute(
+            select(GuardianLink.assurance_level)
+            .join(GuardianConsent, GuardianConsent.guardian_link_id == GuardianLink.id)
+            .where(
+                GuardianConsent.child_user_id == child_user_id,
+                GuardianConsent.status == ConsentStatus.ACTIVE,
+            )
+        )
+        row = result.scalars().first()
+        return row if row is not None else None
 
     async def revoke_consent(self, consent: GuardianConsent, *, when: datetime) -> None:
         consent.status = ConsentStatus.REVOKED

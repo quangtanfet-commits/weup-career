@@ -1,208 +1,188 @@
-# Data Flow Diagrams
+# Sơ đồ Luồng Dữ liệu — WeUp Career
 
-**Version:** 1.0.0 | **Date:** 2026-05-27
+**Phiên bản:** 2.0.0 | **Ngày:** 2026-05-29
+
+> Neo vào [`docs/spec.md`](../spec.md) §8 (CP-1…CP-8) và [`docs/legal/legal-basis.md`](../legal/legal-basis.md). Các luồng nhấn mạnh **cổng đồng ý giám hộ**, **xử lý dữ liệu nhạy cảm + audit**, và **gợi ý human-in-the-loop**.
 
 ---
 
-## System-Level Data Flow
+## Luồng dữ liệu cấp hệ thống
 
 ```mermaid
 flowchart TD
     subgraph "Client"
-        BROWSER["Browser\n(User Actions)"]
+        BROWSER["Browser\n(Student/Guardian/Counselor)"]
         LOCALMEM["Memory\n(access_token)"]
         COOKIE["httpOnly Cookie\n(refresh_token)"]
     end
-
     subgraph "Nginx (Edge)"
-        RATELIMIT["Rate Limiter\n(nginx lua / limit_req)"]
+        RATELIMIT["Rate Limiter\n(limit_req)"]
         STATICFILE["Static File Server\n(Frontend Bundle)"]
         PROXY["Reverse Proxy\n/api/* → backend:8000"]
         SECHEADERS["Security Headers\nCSP, HSTS, X-Frame"]
     end
-
     subgraph "Backend API"
-        MIDDLEWARE["Middleware Stack\n- Correlation ID\n- Request timing\n- CORS\n- Trusted hosts"]
-        AUTHDEP["Auth Dependency\nJWT validation\nuser injection"]
-        HANDLER["Route Handler\nRequest validation\nResponse formatting"]
-        SERVICE["Service Layer\nBusiness logic\nOwnership checks"]
-        REPO["Repository Layer\nSQL queries\nData mapping"]
-        LOGGER["Structured Logger\nNDJSON to stdout"]
+        MIDDLEWARE["Middleware\nCorrelation ID · timing · CORS"]
+        AUTHDEP["Auth Dependency\nJWT validation · inject actor"]
+        CONSENT["Consent Guard\n<16 ⇒ cần GuardianConsent active (CP-1)"]
+        RBAC["RBAC/Scope\nguardian↔child · counselor↔student (CP-4)"]
+        HANDLER["Route Handler"]
+        SERVICE["Service Layer\nlogic · ownership · consent"]
+        REPO["Repository Layer"]
+        CRYPTO["Field Crypto\n(kết quả nhạy cảm)"]
+        AUDIT["Audit Writer\n1 audit / đọc nhạy cảm (CP-3)"]
+        LOGGER["Structured Logger\nNDJSON (không log PII/nhạy cảm)"]
     end
-
     subgraph "Persistence"
-        SQLITE[("SQLite\nWAL mode\n- users\n- todos\n- tags\n- refresh_tokens")]
+        DB[("DB (SQLite→Postgres)\nusers · guardian_consent\nassessment_result(enc)\ncompetency · careers · reco")]
+        AUDITDB[("Audit Store\nappend-only")]
     end
 
-    BROWSER -->|"HTTPS GET /\n(static assets)"| RATELIMIT
-    RATELIMIT --> STATICFILE
-    STATICFILE -->|"HTML/JS/CSS bundle"| BROWSER
-
-    BROWSER -->|"HTTPS POST/GET /api/v1/*\nAuthorization: Bearer {token}"| RATELIMIT
-    RATELIMIT --> SECHEADERS
-    SECHEADERS --> PROXY
-    PROXY --> MIDDLEWARE
-    MIDDLEWARE --> AUTHDEP
-    AUTHDEP -->|"current_user injected"| HANDLER
-    HANDLER --> SERVICE
-    SERVICE --> REPO
-    REPO -->|"SQL via aiosqlite"| SQLITE
-    SQLITE -->|"Rows / affected count"| REPO
-    REPO -->|"Domain objects"| SERVICE
-    SERVICE -->|"Results"| HANDLER
-    HANDLER -->|"JSON response"| BROWSER
-
-    MIDDLEWARE -->|"Log every request"| LOGGER
-    HANDLER -->|"Log business events"| LOGGER
-
-    BROWSER -->|"Stores token"| LOCALMEM
-    BROWSER -->|"Cookie auto-sent"| COOKIE
+    BROWSER -->|"HTTPS GET / (static)"| RATELIMIT --> STATICFILE -->|"bundle"| BROWSER
+    BROWSER -->|"HTTPS /api/v1/*\nBearer {token}"| RATELIMIT --> SECHEADERS --> PROXY --> MIDDLEWARE --> AUTHDEP
+    AUTHDEP --> CONSENT --> RBAC --> HANDLER --> SERVICE --> REPO --> DB
+    SERVICE -. "đọc/ghi kết quả nhạy cảm" .-> CRYPTO
+    HANDLER -. "đọc dữ liệu nhạy cảm" .-> AUDIT --> AUDITDB
+    DB -->|"rows"| REPO --> SERVICE --> HANDLER -->|"JSON"| BROWSER
+    MIDDLEWARE -->|"log request"| LOGGER
+    BROWSER -->|"token"| LOCALMEM
+    BROWSER -->|"cookie auto"| COOKIE
 ```
 
 ---
 
-## Authentication Data Flow
+## Luồng xác thực (Authentication)
 
 ```mermaid
 flowchart LR
-    subgraph "Login Request"
+    subgraph "Login"
         CREDS["email + password"]
     end
-
     subgraph "Backend — Auth Service"
-        LOOKUP["DB lookup\nby email"]
+        LOOKUP["DB lookup by email"]
         BCRYPT["bcrypt.checkpw\n(timing-safe)"]
-        JWTGEN["JWT generation\n- sub: user_id\n- exp: +15min\n- jti: uuid\n- iss: todo-api"]
-        RTGEN["Refresh token\n- random 32 bytes\n- SHA-256 hash\n- store hash only"]
+        JWTGEN["JWT\nsub:user_id · exp:+15m\njti:uuid · iss:weup-api"]
+        RTGEN["Refresh token\nrandom 32B · SHA-256\nlưu hash"]
     end
-
     subgraph "Response"
-        BODY["JSON body:\naccess_token\nuser profile"]
-        HCOOKIE["Set-Cookie:\nrefresh_token=...\nhttpOnly\nSecure\nSameSite=Strict\nPath=/api/v1/auth/refresh\nMax-Age=604800 (7d)"]
+        BODY["JSON: access_token + profile\n(+ account_status)"]
+        HCOOKIE["Set-Cookie: refresh_token=… (7d)"]
     end
-
-    subgraph "Client Storage"
-        MEM["In-memory (Zustand)\naccess_token\n(cleared on page close)"]
-        BROWSER_COOKIE["Browser httpOnly cookie\n(inaccessible to JS)"]
-    end
-
     CREDS --> LOOKUP --> BCRYPT --> JWTGEN & RTGEN
     JWTGEN --> BODY
     RTGEN --> HCOOKIE
-    BODY --> MEM
-    HCOOKIE --> BROWSER_COOKIE
 ```
+
+> Nếu `account_status = pending_guardian_consent`, đăng nhập thành công nhưng frontend **chặn route dữ liệu hướng nghiệp** và điều hướng tới luồng giám hộ.
 
 ---
 
-## Todo Query Data Flow (List with Filters)
+## ⭐ Luồng đăng ký + Đồng ý giám hộ (<16) — CP-1/CP-2
 
 ```mermaid
 flowchart TD
-    subgraph "Frontend"
-        FILTERBAR["Filter Bar Component\n- status dropdown\n- priority filter\n- tag multi-select\n- search text\n- due date range"]
-        QUERYPARAMS["URL Query Params\n?status=open&tag=work\n&search=meeting&priority=high"]
-        TANSTACK["TanStack Query\ncacheKey: ['todos', filters]\nstaleTime: 30s\ncacheTime: 5min"]
-        SKELETON["Skeleton Loader\n(shown during fetch)"]
-    end
-
-    subgraph "Network"
-        REQUEST["GET /api/v1/todos\n?status=open\n&priority=high\n&tag_ids=uuid1,uuid2\n&search=meeting\n&page=1&per_page=50\n&sort=sort_order"]
-    end
-
-    subgraph "Backend"
-        PARSE["Parse + validate\nquery params\n(Pydantic model)"]
-        AUTHCHECK["Inject current_user\nfrom JWT"]
-        QUERY["SQLAlchemy query\nWHERE user_id = ?\nAND is_deleted = false\nAND status IN (?)\nAND priority = ?\nAND title LIKE ?\nJOIN todo_tags...\nORDER BY sort_order\nLIMIT ? OFFSET ?"]
-        COUNT["COUNT(*) for total\n(same filters, no pagination)"]
-        RESPONSE["PaginatedResponse\n{items, total, page, per_page}"]
-    end
-
-    FILTERBAR -->|"debounced 300ms"| QUERYPARAMS
-    QUERYPARAMS --> TANSTACK
-    TANSTACK --> SKELETON
-    TANSTACK --> REQUEST
-    REQUEST --> PARSE
-    PARSE --> AUTHCHECK
-    AUTHCHECK --> QUERY & COUNT
-    QUERY --> RESPONSE
-    COUNT --> RESPONSE
-    RESPONSE --> TANSTACK
-    TANSTACK --> FILTERBAR
+    REG["Đăng ký: email, password, date_of_birth"] --> AGE{"age_band?"}
+    AGE -->|"≥16 (adult/16_17)"| ACTIVE["account_status = active\n→ dùng đầy đủ"]
+    AGE -->|"under_16"| PENDING["account_status = pending_guardian_consent\n⛔ KHÔNG xử lý dữ liệu hướng nghiệp"]
+    PENDING --> INVITE["Trẻ nhập thông tin người giám hộ\nPOST /guardians/invite"]
+    INVITE --> VERIFY["Guardian xác nhận qua kênh độc lập\n(email / VNeID)"]
+    VERIFY --> CONSENT["Tạo GuardianConsent status=active\nPOST /guardians/consent"]
+    CONSENT --> UNLOCK["account_status = active\n→ trắc nghiệm/gợi ý mở khóa"]
+    UNLOCK --> REVOKE{"Guardian thu hồi?"}
+    REVOKE -->|"có"| BACK["consent=revoked\n→ về pending; dừng xử lý MỚI (CP-2)"]
+    REVOKE -->|"không"| OK["tiếp tục"]
+    BACK --> CONSENT
 ```
+
+**Bất biến (TLA+ ConsentLifecycle):** không có `AssessmentResult`/`Recommendation` nào của user `under_16` được tạo khi không có consent `active` (CP-1); sau thu hồi, không xử lý mới đến khi active lại (CP-2).
 
 ---
 
-## Request Correlation & Observability Data Flow
+## ⭐ Luồng làm trắc nghiệm (RIASEC/VIPS/MBTI) — dữ liệu nhạy cảm + audit
+
+```mermaid
+flowchart TD
+    START["Học sinh mở /assessments/{type}"] --> GATE{"consent OK?\n(CP-1)"}
+    GATE -->|"không (<16, chưa consent)"| BLOCK["403 GUARDIAN_CONSENT_REQUIRED"]
+    GATE -->|"có"| SUBMIT["POST /assessments/{type}/submit\n(câu trả lời)"]
+    SUBMIT --> SCORE["Service chấm điểm\n(RIASEC/VIPS/MBTI)"]
+    SCORE --> ENC["Field Crypto: mã hóa payload\nis_sensitive=true, version++"]
+    ENC --> SAVE["Lưu AssessmentResult (encrypted)"]
+    SAVE --> EXPLAIN["Trả kết quả + GIẢI THÍCH\n(không kết luận cứng 1 nghề)"]
+    EXPLAIN --> READ["Mỗi lần đọc kết quả về sau"]
+    READ --> AUDIT["Audit Writer: 1 audit_log\nis_sensitive_access=true (CP-3)"]
+    AUDIT --> SHOW["Hiển thị (student / guardian / counselor theo RBAC)"]
+```
+
+> Kết quả gắn `competency_code` (chủ yếu NL1) + `dieu5_code=b`. Item ưu tiên nguồn **ILO Việt Nam** (sources.md §2). Người dùng/guardian có thể **xuất/xóa** (quyền chủ thể dữ liệu).
+
+---
+
+## Luồng thư viện nghề (Career Library) — Điều 5(a)
+
+```mermaid
+flowchart TD
+    FILTER["Filter: nhóm RIASEC · lĩnh vực · trình độ đào tạo"] -->|"debounced"| REQ["GET /api/v1/careers?riasec=…&field=…"]
+    REQ --> PARSE["Validate query (Pydantic)"]
+    PARSE --> QUERY["Query CareerProfile\nWHERE riasec_codes overlap …\nORDER BY relevance"]
+    QUERY --> RESP["PaginatedResponse {items,total,page}"]
+    RESP --> LINK["Liên kết: kết quả RIASEC → nghề gợi ý liên quan"]
+```
+
+> Thư viện nghề **versioned**, rà soát/cập nhật định kỳ (TT 16/2026); bao gồm nhánh GDNN & "trường trung học nghề" (Luật GDNN 124/2025).
+
+---
+
+## ⭐ Luồng gợi ý có giải thích (Human-in-the-loop) — CP-5/CP-6
+
+```mermaid
+flowchart TD
+    TRIGGER["Yêu cầu gợi ý\n(POST /recommendations)"] --> INPUT["Thu thập: hồ sơ + kết quả test + tiến bộ năng lực"]
+    INPUT --> GEN["Recommendation Engine sinh gợi ý"]
+    GEN --> RAT{"có rationale?\n(CP-6)"}
+    RAT -->|"không"| REJECT["Từ chối tạo (vi phạm CP-6)"]
+    RAT -->|"có"| CREATE["Tạo Recommendation\nstatus=proposed\nrequires_human_confirmation=true"]
+    CREATE --> DISPLAY["Hiển thị: gợi ý + LÝ DO\n+ cảnh báo 'quyết định thuộc về bạn/giám hộ/GV'"]
+    DISPLAY --> HUMAN{"Người xác nhận\n(student/guardian/counselor)"}
+    HUMAN -->|"accepted/rejected/deferred"| CONFIRM["POST /recommendations/{id}/confirm\nconfirmed_by = người"]
+    CONFIRM --> APPLY["Chỉ khi accepted (do người) mới đưa vào lộ trình"]
+    HUMAN -. "hệ thống KHÔNG tự áp dụng" .-> NOOP["(không hành động tự động)"]
+```
+
+**Bất biến (TLA+ RecommendationGovernance):** không gợi ý nào thiếu `rationale` (CP-6); không gợi ý nào có hiệu lực khi chưa có người xác nhận (CP-5). Trùng khớp nguyên tắc **không ép buộc phân luồng** (TT 16/2026) + **AI có kiểm soát** (Luật 134/2025 Đ.4).
+
+---
+
+## Luồng Correlation & Observability
 
 ```mermaid
 flowchart LR
     subgraph "Nginx"
-        GEN_ID["Generate\nX-Request-ID\n(if not present)"]
+        GEN_ID["Generate X-Request-ID"]
     end
-
     subgraph "Backend Middleware"
-        EXTRACT["Extract X-Request-ID\nfrom headers"]
-        BIND["Bind to structlog\ncontext variables:\n- request_id\n- user_id (post-auth)\n- path\n- method"]
+        EXTRACT["Extract X-Request-ID"]
+        BIND["Bind structlog ctx:\nrequest_id · actor_id · path · method"]
     end
-
     subgraph "Log Pipeline"
-        STRUCTLOG["structlog\nJSON formatter"]
-        STDOUT["stdout\n(NDJSON stream)"]
-        LOGSHIP["Log shipper\n(e.g. Vector / Fluentd)\nfuture"]
-        ELASTIC["Elasticsearch /\nLoki (future)"]
+        STRUCTLOG["structlog JSON\n(redact PII/nhạy cảm)"]
+        STDOUT["stdout (NDJSON)"]
+        SHIP["Log shipper (Vector/Fluentd, sau)"]
     end
-
-    subgraph "Response"
-        RESP_HEADER["Response header\nX-Request-ID: req_xxx"]
-    end
-
-    GEN_ID --> EXTRACT
-    EXTRACT --> BIND
-    BIND -->|"Every log.info/error\ninherits context"| STRUCTLOG
-    STRUCTLOG --> STDOUT
-    STDOUT --> LOGSHIP
-    LOGSHIP --> ELASTIC
-    BIND --> RESP_HEADER
+    GEN_ID --> EXTRACT --> BIND -->|"mọi log kế thừa ctx"| STRUCTLOG --> STDOUT --> SHIP
+    BIND --> RESP["Response header X-Request-ID"]
 ```
 
 ---
 
-## Soft Delete & Recovery Data Flow
+## Luồng xóa mềm tài khoản & quyền chủ thể dữ liệu
 
 ```mermaid
 flowchart TD
-    subgraph "User Action"
-        DELETE_BTN["User clicks Delete"]
-    end
-
-    subgraph "Frontend"
-        OPT_HIDE["Optimistically hide\nfrom list (instant)"]
-        UNDO_TOAST["Show undo toast\n(5 second timer)"]
-        API_CALL["DELETE /api/v1/todos/{id}"]
-    end
-
-    subgraph "Backend"
-        SOFTDEL["UPDATE todo\nSET is_deleted=true\ndeleted_at=NOW()\nWHERE id=? AND user_id=?"]
-        NOTE1["Todo NOT returned\nin list queries\n(WHERE is_deleted=false)"]
-    end
-
-    subgraph "Recovery Window (30 days)"
-        RESTORE_BTN["User clicks Undo\nor visits /trash"]
-        RESTORE_API["POST /api/v1/todos/{id}/restore"]
-        RESTORE_DB["UPDATE todo\nSET is_deleted=false\ndeleted_at=NULL"]
-    end
-
-    subgraph "Purge Job (daily cron)"
-        PURGE["DELETE FROM todo\nWHERE is_deleted=true\nAND deleted_at < NOW()-30days"]
-    end
-
-    DELETE_BTN --> OPT_HIDE & UNDO_TOAST
-    DELETE_BTN --> API_CALL
-    API_CALL --> SOFTDEL --> NOTE1
-
-    UNDO_TOAST --> RESTORE_BTN
-    RESTORE_BTN --> RESTORE_API --> RESTORE_DB
-
-    NOTE1 --> PURGE
+    REQ["Người dùng/guardian yêu cầu xóa\nDELETE /me hoặc /me/assessments/{id}"] --> SOFT["Soft delete\n(is_deleted=true, cửa sổ khôi phục)"]
+    SOFT --> EXPORT["Hỗ trợ xuất dữ liệu cá nhân (Luật 91/2025)"]
+    SOFT --> PURGE["Purge job định kỳ\nxóa cứng sau cửa sổ khôi phục"]
+    SOFT --> AUDIT["Ghi audit thay đổi (NFR-16)"]
 ```
+
+> Với trẻ <16, **guardian** thực hiện được quyền xóa/xuất thay trẻ. Thu hồi consent (CP-2) là một dạng dừng xử lý, khác với xóa dữ liệu.

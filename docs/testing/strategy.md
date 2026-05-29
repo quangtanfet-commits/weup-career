@@ -1,437 +1,296 @@
-# Testing Strategy
+# Chiến lược Kiểm thử — WeUp Career
 
-**Version:** 1.0.0 | **Date:** 2026-05-27  
-**Target Coverage:** ≥95% lines, 100% on auth + data-access layers
+**Phiên bản:** 2.0.0 | **Ngày:** 2026-05-29
+**Mục tiêu coverage:** ≥95% dòng; **100% trên auth + consent + sensitive-data + recommendation** (spec.md NFR-19)
+**Thay thế:** v1.0.0 (testing Todo app)
 
----
-
-## Testing Philosophy
-
-> "Tests are not a quality gate bolted on afterward. They are the **specification made executable**."
-
-1. **Test behaviour, not implementation**: tests assert what the system does, not how it does it
-2. **Tests as documentation**: a failing test should tell you exactly what invariant broke
-3. **No mocking the DB in integration tests**: use an in-memory SQLite instance; mocks lie
-4. **Fast feedback loop**: unit tests < 1s total; integration tests < 30s; E2E < 3min
-5. **Meaningful coverage**: 95% line coverage with real assertions; zero coverage padding
+> Test là **đặc tả được làm cho chạy được**. Bộ test phải chứng minh các thuộc tính đúng đắn CP-1…CP-8 (spec.md §8) và **không bỏ qua bias testing** (NFR-12) — gate riêng cho công bằng AI.
 
 ---
 
-## Testing Pyramid
+## Triết lý
+1. **Test hành vi, không test cách hiện thực.**
+2. **Test là tài liệu** — test fail phải chỉ rõ bất biến nào vỡ (ưu tiên đặt tên theo CP).
+3. **Không mock DB ở integration** — dùng SQLite in-memory; mock nói dối.
+4. **Phản hồi nhanh** — unit <1s; integration <30s; E2E <3min.
+5. **Coverage có ý nghĩa** — 95% với assertion thật; **100% trên các lớp pháp lý/nhạy cảm**.
+6. **Bias testing là bắt buộc** — không có nó, gợi ý AI không được tin (≠ coverage).
 
+---
+
+## Kim tự tháp test
 ```
-                    ┌──────────────────┐
-                    │   E2E Tests      │  3-5% of tests
-                    │  (Playwright)    │  Slow, high confidence
-                    │  ~20 scenarios   │  Test full user flows
-                    ├──────────────────┤
-                    │ Integration Tests│  25% of tests
-                    │  (httpx + DB)    │  Medium speed
-                    │  ~150 tests      │  Test API + DB together
-                    ├──────────────────┤
-                    │   Unit Tests     │  70% of tests
-                    │  (pytest/vitest) │  Fast, isolated
-                    │  ~500 tests      │  Test business logic
-                    └──────────────────┘
+        ┌──────────────────┐
+        │   E2E (Playwright)│  3–5% · luồng consent/trắc nghiệm/gợi ý
+        ├──────────────────┤
+        │ Integration (httpx│  25% · API + DB + consent gate + audit
+        │   + SQLite)       │
+        ├──────────────────┤
+        │  Unit + Property  │  70% · logic; Hypothesis cho CP invariants
+        └──────────────────┘
+   ┌──────────────────────────────────┐
+   │  TLA+/TLC (formal) · Bias tests   │  gate riêng, ngoài kim tự tháp
+   └──────────────────────────────────┘
 ```
 
 ---
 
 ## Backend Testing
 
-### Unit Tests (pytest)
+### Unit + Property (pytest + Hypothesis)
+**Vị trí:** `backend/tests/unit/`
 
-**Location:** `backend/tests/unit/`
+Test: service layer (mọi nhánh logic), repository (in-memory SQLite), auth (token/hash), **consent logic**, **field crypto**, **recommendation rationale guard**, Pydantic schema.
 
-**What to test:**
-- Service layer: all business logic branches
-- Repository layer: query building (with in-memory SQLite)
-- Auth service: token generation, validation, password hashing
-- Schema validation: Pydantic models with edge cases
-- Utility functions: date formatting, pagination logic
-
-**Test structure:**
 ```python
-# backend/tests/unit/auth/test_auth_service.py
-
 class TestPasswordHashing:
-    def test_hash_is_not_plaintext(self):
-        hashed = hash_password("MyPassword123")
-        assert hashed != "MyPassword123"
-
-    def test_verify_correct_password(self):
-        hashed = hash_password("MyPassword123")
-        assert verify_password("MyPassword123", hashed) is True
-
-    def test_verify_wrong_password(self):
-        hashed = hash_password("MyPassword123")
-        assert verify_password("WrongPassword", hashed) is False
-
     @given(password=st.text(min_size=8, max_size=128))
     @settings(max_examples=500)
     def test_hash_verify_roundtrip(self, password: str):
-        # Property: any valid password can be hashed and verified
-        hashed = hash_password(password)
-        assert verify_password(password, hashed) is True
+        h = hash_password(password)
+        assert verify_password(password, h) is True
 
 class TestTokenGeneration:
-    def test_access_token_contains_expected_claims(self):
-        token = create_access_token(subject="usr_123", email="a@b.com")
-        claims = decode_token(token)
+    def test_access_token_claims(self):
+        claims = decode_token(create_access_token(subject="usr_123", email="a@b.com"))
         assert claims["sub"] == "usr_123"
-        assert claims["iss"] == "todo-api"
-        assert "jti" in claims
-        assert claims["exp"] > claims["iat"]
-
-    def test_expired_token_raises(self):
-        token = create_access_token(subject="usr_123", expire_delta=timedelta(seconds=-1))
-        with pytest.raises(TokenExpiredError):
-            decode_token(token)
+        assert claims["iss"] == "weup-api"
+        assert "jti" in claims and claims["exp"] > claims["iat"]
 ```
 
-**Hypothesis property-based tests:**
-- Password hash/verify roundtrip (500+ cases)
-- JWT encode/decode roundtrip
-- Pydantic schema fuzz (arbitrary strings for title, description)
-- SQL injection attempts in search queries (assert no crash, sanitized output)
-- Sort order invariant after arbitrary reorder sequences
+**Property-based tests cho CP invariants (Hypothesis):**
+- **CP-1:** với chuỗi thao tác ngẫu nhiên trên user <16, không `AssessmentResult`/`Recommendation` nào được tạo khi consent ≠ active.
+- **CP-6:** không thể tạo `Recommendation` với `rationale` rỗng (mọi input).
+- **CP-7:** hash/verify token roundtrip; token revoked luôn bị từ chối.
+- **CP-8:** với chuỗi `advance_depth` ngẫu nhiên, `depth_achieved` không bao giờ giảm.
+- Field crypto: encrypt→decrypt roundtrip cho payload bất kỳ.
+- Pydantic fuzz cho input nghề/nội dung; SQL-injection attempts (không crash, sanitized).
 
-### Integration Tests (pytest + httpx + SQLite in-memory)
+### Integration (pytest + httpx + SQLite in-memory)
+**Vị trí:** `backend/tests/integration/`
 
-**Location:** `backend/tests/integration/`
-
-**Setup:**
 ```python
-# conftest.py
 @pytest.fixture
 async def db():
-    # Fresh in-memory SQLite per test
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with AsyncSession(engine) as session:
-        yield session
+    async with engine.begin() as c: await c.run_sync(Base.metadata.create_all)
+    async with AsyncSession(engine) as s: yield s
     await engine.dispose()
-
-@pytest.fixture
-async def client(db):
-    app.dependency_overrides[get_db] = lambda: db
-    async with AsyncClient(app=app, base_url="http://test") as c:
-        yield c
 ```
 
-**Auth integration tests:**
+**Consent gate (CP-1/CP-2 — 100% nhánh):**
 ```python
-class TestAuthEndpoints:
-    async def test_register_creates_user(self, client):
-        resp = await client.post("/api/v1/auth/register", json={
-            "email": "test@example.com",
-            "password": "SecurePass123"
-        })
-        assert resp.status_code == 201
-        data = resp.json()
-        assert data["email"] == "test@example.com"
-        assert "hashed_password" not in data  # Never leaked
+class TestConsentGate:
+    async def test_under16_blocked_without_consent(self, client, child_token):
+        r = await client.post("/api/v1/assessments/riasec/submit",
+                              json=SAMPLE, headers=auth(child_token))
+        assert r.status_code == 403
+        assert r.json()["error"]["code"] == "GUARDIAN_CONSENT_REQUIRED"
 
-    async def test_register_duplicate_email_returns_409(self, client):
-        payload = {"email": "dup@example.com", "password": "SecurePass123"}
-        await client.post("/api/v1/auth/register", json=payload)
-        resp = await client.post("/api/v1/auth/register", json=payload)
-        assert resp.status_code == 409
+    async def test_under16_allowed_after_consent(self, client, child_token, active_consent):
+        r = await client.post("/api/v1/assessments/riasec/submit",
+                              json=SAMPLE, headers=auth(child_token))
+        assert r.status_code == 201
 
-    async def test_login_sets_httponly_cookie(self, client, registered_user):
-        resp = await client.post("/api/v1/auth/login", json={
-            "email": registered_user.email,
-            "password": "SecurePass123"
-        })
-        assert resp.status_code == 200
-        cookie = resp.cookies.get("refresh_token")
-        assert cookie is not None
-        # Verify httpOnly flag set (httpx exposes headers)
-        set_cookie_header = resp.headers.get("set-cookie", "")
-        assert "HttpOnly" in set_cookie_header
-        assert "Secure" in set_cookie_header
-        assert "SameSite=Strict" in set_cookie_header
-
-    async def test_invalid_credentials_return_401(self, client, registered_user):
-        resp = await client.post("/api/v1/auth/login", json={
-            "email": registered_user.email,
-            "password": "WrongPassword"
-        })
-        assert resp.status_code == 401
-        # Generic message — no enumeration
-        assert resp.json()["error"]["code"] == "INVALID_CREDENTIALS"
+    async def test_revoke_blocks_new_processing(self, client, child_token, active_consent):
+        await revoke(active_consent)
+        r = await client.post("/api/v1/assessments/riasec/submit",
+                              json=SAMPLE, headers=auth(child_token))
+        assert r.status_code == 403   # CP-2
 ```
 
-**Authorization integration tests (CRITICAL — 100% branch coverage required):**
+**Dữ liệu nhạy cảm + audit (CP-3 — 100%):**
 ```python
-class TestTodoOwnership:
-    async def test_user_cannot_read_another_users_todo(
-        self, client, user1_token, user2_todo
-    ):
-        resp = await client.get(
-            f"/api/v1/todos/{user2_todo.id}",
-            headers={"Authorization": f"Bearer {user1_token}"}
-        )
-        # Returns 404 — not even 403 (don't confirm existence)
-        assert resp.status_code == 404
-
-    async def test_user_cannot_delete_another_users_todo(
-        self, client, user1_token, user2_todo
-    ):
-        resp = await client.delete(
-            f"/api/v1/todos/{user2_todo.id}",
-            headers={"Authorization": f"Bearer {user1_token}"}
-        )
-        assert resp.status_code == 404
-
-    async def test_user_cannot_update_another_users_todo(
-        self, client, user1_token, user2_todo
-    ):
-        resp = await client.patch(
-            f"/api/v1/todos/{user2_todo.id}",
-            json={"title": "Hijacked"},
-            headers={"Authorization": f"Bearer {user1_token}"}
-        )
-        assert resp.status_code == 404
+class TestSensitiveAccessAudit:
+    async def test_every_result_read_writes_one_audit(self, client, user_token, a_result, audit_repo):
+        before = await audit_repo.count_sensitive()
+        await client.get(f"/api/v1/me/assessments/{a_result.id}", headers=auth(user_token))
+        after = await audit_repo.count_sensitive()
+        assert after == before + 1            # CP-3
+    async def test_result_payload_encrypted_at_rest(self, db, a_result):
+        raw = await db.execute(text("SELECT result_payload FROM assessment_result WHERE id=:i"),
+                               {"i": a_result.id})
+        assert b"realistic" not in raw.scalar()   # không lưu plaintext
 ```
 
-**Coverage targets for integration tests:**
-- All happy paths: 100%
-- All 4xx error paths: 100%
-- All ownership check branches: 100%
-- All status transition paths: 100%
+**RBAC quan hệ (CP-4 — 100%):**
+```python
+class TestRelationalRBAC:
+    async def test_user_cannot_read_others_result(self, client, u1_token, u2_result):
+        r = await client.get(f"/api/v1/me/assessments/{u2_result.id}", headers=auth(u1_token))
+        assert r.status_code == 404          # không xác nhận tồn tại
+    async def test_counselor_cannot_access_other_school_student(self, client, counselor_token, other_school_student):
+        r = await client.get(f"/api/v1/school/{OTHER}/students", headers=auth(counselor_token))
+        assert r.status_code == 403
+    async def test_guardian_only_sees_linked_child(self, client, guardian_token, unlinked_child):
+        r = await client.get(f"/api/v1/users/{unlinked_child.id}/progress", headers=auth(guardian_token))
+        assert r.status_code in (403, 404)
+```
+
+**Gợi ý human-in-the-loop (CP-5/CP-6 — 100%):**
+```python
+class TestRecommendationGovernance:
+    async def test_recommendation_always_has_rationale(self, client, user_token):
+        r = await client.post("/api/v1/recommendations", headers=auth(user_token))
+        assert r.json()["rationale"]            # CP-6
+        assert r.json()["requires_human_confirmation"] is True
+    async def test_pathway_not_applied_without_human_confirm(self, client, user_token, proposed_reco):
+        # không có endpoint nào tự áp dụng khi chưa confirm
+        applied = await get_pathway_state(proposed_reco.user_id)
+        assert applied is None                  # CP-5
+```
+
+**Coverage integration:** happy path 100%; mọi nhánh 4xx 100%; mọi nhánh consent/ownership/relation 100%; mọi nhánh chuyển trạng thái reco 100%.
 
 ---
 
-## Frontend Testing
+## Frontend Testing (Vitest + RTL + MSW)
+**Vị trí:** `frontend/src/**/*.test.tsx`
 
-### Unit Tests (Vitest + React Testing Library)
+Test: hooks (`useAuth`, `useConsent`, `useAssessment`, `useRecommendation`), Zod schema, component states (loading/error/empty/populated), và **các trạng thái cổng consent**.
 
-**Location:** `frontend/src/**/*.test.tsx` (colocated)
-
-**What to test:**
-- Custom hooks: `useAuth`, `useTodos`, `useOptimisticTodo`
-- Form validation: Zod schemas with edge cases
-- Utility functions: date formatters, priority comparators
-- API client: request/response transformations
-- Component rendering: key UI states (loading, error, empty, populated)
-
-**MSW handlers for API mocking:**
 ```typescript
-// src/mocks/handlers.ts
-export const handlers = [
-  http.get('/api/v1/todos', ({ request }) => {
-    const url = new URL(request.url)
-    const status = url.searchParams.get('status')
-    return HttpResponse.json({
-      items: mockTodos.filter(t => !status || t.status === status),
-      total: mockTodos.length,
-      page: 1,
-      per_page: 50
-    })
-  }),
-  http.post('/api/v1/todos', async ({ request }) => {
-    const body = await request.json()
-    return HttpResponse.json(createMockTodo(body), { status: 201 })
-  }),
-  // ... all handlers
-]
-```
-
-**Component test example:**
-```typescript
-// src/features/todos/TodoItem.test.tsx
-describe('TodoItem', () => {
-  it('renders todo title and status badge', async () => {
-    renderWithProviders(<TodoItem todo={mockTodo} />)
-    expect(screen.getByText('Buy groceries')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /complete/i })).toBeInTheDocument()
+describe('GuardianGate', () => {
+  it('chặn vào assessment khi pending_guardian_consent', () => {
+    renderWithProviders(<App />, { account_status: 'pending_guardian_consent' })
+    expect(screen.getByText(/cần đồng ý của người giám hộ/i)).toBeInTheDocument()
   })
-
-  it('calls onDelete when delete button clicked and confirmed', async () => {
-    const onDelete = vi.fn()
-    renderWithProviders(<TodoItem todo={mockTodo} onDelete={onDelete} />)
-    await userEvent.click(screen.getByRole('button', { name: /delete/i }))
-    // Undo toast appears — delete triggered but not confirmed deletion
-    expect(screen.getByText(/undo/i)).toBeInTheDocument()
-    expect(onDelete).toHaveBeenCalledWith(mockTodo.id)
+})
+describe('RecommendationCard', () => {
+  it('luôn hiển thị lý do và nút xác nhận, không tự áp dụng', () => {
+    renderWithProviders(<RecommendationCard reco={mockReco} />)
+    expect(screen.getByText(mockReco.rationale)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /chấp nhận|từ chối/i })).toBeInTheDocument()
   })
-
-  it('shows loading skeleton while fetching', () => {
-    renderWithProviders(<TodoItem todo={undefined} isLoading />)
-    expect(screen.getByTestId('todo-skeleton')).toBeInTheDocument()
+})
+describe('AssessmentResultView', () => {
+  it('không kết luận cứng một nghề; hiển thị giải thích', () => {
+    renderWithProviders(<AssessmentResultView result={mockRiasec} />)
+    expect(screen.queryByText(/bạn phải làm nghề/i)).not.toBeInTheDocument()
   })
 })
 ```
 
-### E2E Tests (Playwright)
+---
 
-**Location:** `e2e/`
-
-**Browser matrix:** Chromium + Firefox + WebKit
-
-**Critical user flows to cover:**
+## E2E Tests (Playwright — Chromium + Firefox + WebKit)
+**Vị trí:** `e2e/`
 
 ```gherkin
-# Registration and login flow
-Feature: Authentication
-  Scenario: User registers and is automatically logged in
-  Scenario: User with existing account logs in successfully
-  Scenario: Login with wrong password shows error
-  Scenario: Refresh token silently renews session
+Feature: Xác thực & Đăng ký
+  Scenario: Người ≥16 đăng ký và vào dashboard
+  Scenario: Người <16 đăng ký → chuyển sang luồng mời giám hộ
+  Scenario: Refresh token gia hạn phiên im lặng
 
-# Core todo operations
-Feature: Todo Management
-  Scenario: User creates a todo and it appears in the list
-  Scenario: User completes a todo and sees status change
-  Scenario: User deletes a todo and can undo within 5 seconds
-  Scenario: User filters todos by status
-  Scenario: User searches todos by text
-  Scenario: User reorders todos by drag and drop
+Feature: Đồng ý giám hộ (<16)
+  Scenario: Giám hộ xác nhận → mở khóa trắc nghiệm
+  Scenario: Trẻ <16 chưa consent bị chặn làm trắc nghiệm (403)
+  Scenario: Giám hộ thu hồi → trẻ bị chặn xử lý dữ liệu mới
 
-# Tag management
-Feature: Tags
-  Scenario: User creates a tag and assigns it to a todo
-  Scenario: User filters todos by tag
+Feature: Trắc nghiệm định hướng
+  Scenario: Học sinh làm RIASEC và xem kết quả kèm giải thích
+  Scenario: Học sinh xuất/xóa kết quả của mình
 
-# Error handling
-Feature: Error Handling
-  Scenario: Expired session redirects to login
-  Scenario: Offline state shows appropriate feedback
+Feature: Gợi ý nghề (human-in-the-loop)
+  Scenario: Gợi ý hiển thị kèm lý do; người dùng phải xác nhận
+  Scenario: Hệ thống không tự áp dụng phân luồng
+
+Feature: Tư vấn học đường (counselor)
+  Scenario: Counselor chỉ thấy học sinh trong trường mình
 ```
 
-**Playwright setup:**
 ```typescript
-// playwright.config.ts
+// playwright.config.ts (trích)
 export default defineConfig({
   testDir: './e2e',
-  use: {
-    baseURL: 'http://localhost:80',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-  },
+  use: { baseURL: 'http://localhost:80', trace: 'on-first-retry',
+         screenshot: 'only-on-failure', video: 'retain-on-failure' },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox',  use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit',   use: { ...devices['Desktop Safari'] } },
     { name: 'mobile',   use: { ...devices['iPhone 13'] } },
   ],
-  webServer: {
-    command: 'docker compose -f docker-compose.test.yml up',
-    url: 'http://localhost:80/api/v1/health',
-    reuseExistingServer: false,
-  },
 })
 ```
 
 ---
 
 ## Security Tests
-
-| Test | Tool | Threshold |
-|------|------|-----------|
-| SAST | Semgrep (`p/python`, `p/react`, `p/security`) | Zero findings |
-| Container CVE scan | Trivy | Zero HIGH/CRITICAL |
-| Dependency audit | pip-audit + npm audit | Zero HIGH+ |
-| DAST baseline | OWASP ZAP (`zap-baseline.py`) | Zero HIGH findings |
-| Security headers | `securityheaders.com` equivalent | A+ grade |
+| Test | Công cụ | Ngưỡng |
+|------|---------|--------|
+| SAST | Semgrep (`p/python`,`p/react`,`p/security`) | 0 finding |
+| Container CVE | Trivy | 0 HIGH/CRITICAL |
+| Dependency audit | pip-audit + npm audit | 0 HIGH+ |
+| DAST baseline | OWASP ZAP | 0 HIGH |
+| Security headers | đánh giá A+ | A+ |
+| **Sensitive-data leak** | test riêng: không log/serialize kết quả nhạy cảm | 0 |
+| **Consent bypass** | test mọi route dữ liệu hướng nghiệp đều qua Consent Guard | 0 đường vòng |
 
 ---
 
-## Load/Performance Tests
+## ⭐ Bias Testing (NFR-12, Luật 134/2025 Đ.4) — gate riêng
 
-**Tool:** k6 (JavaScript-based load testing)
+> Khung đầy đủ (metric M1–M5, ngưỡng, sinh dữ liệu, cấu trúc test, cổng CI): [`bias-testing.md`](./bias-testing.md).
 
-**Scenarios:**
+Không phải coverage; là kiểm thử **công bằng** của bộ trắc nghiệm & thuật toán gợi ý.
+
+- **Phân nhóm:** giới tính, vùng miền, hoàn cảnh KT-XH, học lực.
+- **Chỉ số:** so sánh phân phối gợi ý nghề/phân luồng giữa các nhóm với hồ sơ tương đương; phát hiện chênh lệch có hệ thống (vd: cùng RIASEC nhưng nữ ít được gợi ý nghề kỹ thuật hơn nam).
+- **Ngưỡng:** chênh lệch vượt ngưỡng đã định ⇒ **fail CI**, phải tài liệu hóa & hiệu chỉnh.
+- **Bất biến cứng:** RIASEC/MBTI **không khóa cứng** lựa chọn theo định kiến giới/vùng.
+- Đầu ra: báo cáo bias đính kèm mỗi release (Gate C).
+
+---
+
+## Load/Performance (k6)
 ```javascript
-// k6/scenarios/baseline.js
 export const options = {
   scenarios: {
-    steady_load: {
-      executor: 'constant-vus',
-      vus: 50,
-      duration: '5m',
-    },
-    spike: {
-      executor: 'ramping-vus',
-      stages: [
-        { duration: '30s', target: 0 },
-        { duration: '30s', target: 200 },  // Spike
-        { duration: '1m',  target: 200 },
-        { duration: '30s', target: 0 },
-      ],
-    },
+    steady: { executor: 'constant-vus', vus: 200, duration: '5m' },
+    spike:  { executor: 'ramping-vus', stages: [
+      { duration:'30s', target:0 }, { duration:'30s', target:400 },
+      { duration:'1m', target:400 }, { duration:'30s', target:0 } ] },
   },
   thresholds: {
-    http_req_duration: ['p(99)<100'],   // p99 < 100ms for reads
-    http_req_failed: ['rate<0.01'],     // <1% error rate
+    'http_req_duration{op:read}':  ['p(99)<150'],
+    'http_req_duration{op:write}': ['p(99)<300'],
+    http_req_failed: ['rate<0.01'],
   },
 }
 ```
+> Chú ý tải riêng cho endpoint **trắc nghiệm** & **gợi ý** (tốn tính toán hơn CRUD).
 
 ---
 
 ## Coverage Configuration
 
 ### Backend (pytest-cov)
-
 ```toml
-# pyproject.toml
 [tool.coverage.run]
-source = ["app"]
-branch = true
-omit = ["*/tests/*", "*/migrations/*", "app/main.py"]
-
+source = ["app"]; branch = true
+omit = ["*/tests/*","*/migrations/*","app/main.py"]
 [tool.coverage.report]
 fail_under = 95
-show_missing = true
-exclude_lines = [
-    "pragma: no cover",
-    "if TYPE_CHECKING:",
-    "class.*Protocol.*:",
-    "@(abc\\.)?abstractmethod",
-]
 ```
-
-**100% branch coverage required for:**
-- `app/auth/service.py`
-- `app/auth/router.py`
-- `app/todos/repository.py`
-- `app/core/security.py`
+**100% branch bắt buộc:** `app/core/consent.py`, `app/core/authz.py`, `app/core/audit.py`, `app/core/crypto.py`, `app/auth/service.py`, `app/guardians/service.py`, `app/assessments/service.py`, `app/reco/service.py`.
 
 ### Frontend (Vitest)
-
 ```typescript
-// vitest.config.ts
-export default {
-  test: {
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'lcov', 'html'],
-      thresholds: {
-        lines: 95,
-        branches: 90,
-        functions: 95,
-      },
-      exclude: ['src/main.tsx', 'src/mocks/**', '**/*.stories.tsx'],
-    },
-  },
-}
+coverage: { provider: 'v8', thresholds: { lines: 95, branches: 90, functions: 95 },
+  exclude: ['src/main.tsx','src/mocks/**','**/*.stories.tsx'] }
 ```
 
 ---
 
 ## CI Quality Gate Summary
-
 ```yaml
-# CI fails if ANY of these thresholds are not met:
-backend_coverage: >= 95%        # pytest --cov-fail-under=95
-frontend_coverage: >= 95%       # vitest --coverage
-type_errors: 0                  # mypy --strict && tsc --noEmit
-lint_errors: 0                  # ruff + eslint --max-warnings 0
-e2e_failures: 0                 # playwright across 3 browsers
-security_findings: 0            # trivy + semgrep + zap
-tla_invariants: all_pass        # TLC model checker
+backend_coverage:  >= 95%   # 100% trên consent/sensitive/auth/reco
+frontend_coverage: >= 95%
+type_errors: 0              # mypy --strict && tsc --noEmit
+lint_errors: 0
+e2e_failures: 0            # playwright × 3 browsers (gồm luồng consent/reco)
+security_findings: 0      # trivy + semgrep + zap + sensitive-leak + consent-bypass
+bias_test: pass           # công bằng giới/vùng/hoàn cảnh (NFR-12)
+tla_invariants: all_pass  # TLC: CP-1..CP-8
 ```

@@ -8,12 +8,13 @@
 
 ## Context
 
-We need persistent storage for user accounts, todos, tags, and session tokens. The initial deployment is a single-node Docker Compose setup. The choice must:
+We need persistent storage cho user accounts, guardian consent, kết quả trắc nghiệm (nhạy cảm, mã hóa), cây năng lực & tiến bộ, thư viện nghề, gợi ý, audit log. Triển khai ban đầu là single-node Docker Compose. Lựa chọn phải:
 
-1. Work with zero external service dependencies (fully self-contained)
-2. Allow future migration to a networked RDBMS without application-code rewrites
-3. Handle concurrent reads from multiple Uvicorn/Gunicorn workers
-4. Support full ACID transactions
+1. Chạy với zero external dependency cho MVP (tự chứa)
+2. Cho phép migrate sang RDBMS mạng **không phải viết lại code** (PostgreSQL ở production cấp Sở/quốc gia)
+3. Đọc đồng thời từ nhiều worker
+4. ACID đầy đủ
+5. Hỗ trợ **mã hóa trường nhạy cảm** (kết quả trắc nghiệm) và **audit log append-only**
 
 ---
 
@@ -34,7 +35,7 @@ SQLite is not "toy" storage. It is:
 - A single file — trivial backup (`cp app.db backup.db`)
 - Zero operational overhead — no separate process, no networking, no config
 
-For a single-node Todo application with <10,000 users, SQLite is not a constraint — it is a correct choice.
+Cho MVP single-node (cụm trường thí điểm THCS/THPT), SQLite là lựa chọn đúng. **Ở quy mô cấp Sở/quốc gia, production chuyển sang PostgreSQL** (xem `docs/scalability/strategy.md`) — cần cho JSONB/GIN (lọc `riasec_codes`), replica, và phân tích quy mô lớn.
 
 **WAL mode specifics:**
 - Write-Ahead Logging enables concurrent reads without blocking writes
@@ -61,7 +62,7 @@ The application accesses the database **only through SQLAlchemy**. No raw SQL st
 |----------|---------|
 | PostgreSQL | Correct long-term choice; adds operational complexity for v1 (container, config, password management, connection pooling). Defer to Phase 3 migration. |
 | MySQL / MariaDB | Less precise type system; less clean JSON support; no meaningful advantage over PostgreSQL |
-| MongoDB | Breaks ACID for relational data (todos with tags, users, tokens); impedance mismatch |
+| MongoDB | Breaks ACID for relational data (user ↔ consent ↔ assessment ↔ competency ↔ recommendation); impedance mismatch |
 | PlanetScale / Turso | Introduces external cloud dependency; vendor lock-in; unnecessary for v1 |
 | In-memory only | Survives restarts — unacceptable |
 
@@ -72,8 +73,9 @@ The application accesses the database **only through SQLAlchemy**. No raw SQL st
 ### Constraints accepted
 - Single writer at a time (SQLite WAL limitation) — acceptable given expected write volume
 - No stored procedures (SQLite limitation) — no business logic in DB; all in service layer (preferred)
-- No JSON column indexing (SQLite limitation) — no JSONB columns in schema
-- SQLite file must be on a persistent volume in Docker; not ephemeral storage
+- No JSON column indexing ở SQLite — lọc `riasec_codes` ở MVP dùng cách đơn giản; **JSONB/GIN khi lên PostgreSQL** (một lý do chuyển sớm ở production)
+- SQLite file phải nằm trên persistent volume; không dùng ephemeral storage
+- **Trường nhạy cảm (`assessment_result.result_payload`) mã hóa ở tầng ứng dụng (Field Crypto)** trước khi ghi — không phụ thuộc DB; **audit log append-only** (CP-3)
 
 ### Design rules enforced by this decision
 - All DB access goes through the SQLAlchemy async session

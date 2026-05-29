@@ -22,17 +22,19 @@
 
 ### Code Quality
 - [ ] Tests written / updated (TDD — tests first)
-- [ ] Coverage remains ≥95% (auth + data-access = 100%)
+- [ ] Coverage remains ≥95% (auth + consent + sensitive-data + recommendation = 100%)
 - [ ] `mypy --strict` passes with zero errors
 - [ ] `tsc --noEmit` passes with zero errors
 - [ ] No `any` added to TypeScript without a tracked comment
 - [ ] `ruff` + `eslint --max-warnings 0` clean
 
-### Security
-- [ ] No secrets, tokens, or PII added to code or logs
-- [ ] IDOR checks present on all new resource endpoints
-- [ ] Rate limiting considered for new public endpoints
-- [ ] No new `eval()`, `exec()`, or unsafe deserialization
+### Security & Tuân thủ
+- [ ] No secrets, tokens, or PII (gồm kết quả trắc nghiệm) added to code or logs
+- [ ] IDOR + RBAC quan hệ (guardian↔child, counselor↔student) present on new resource endpoints
+- [ ] Route xử lý dữ liệu hướng nghiệp đi qua Consent Guard (<16) — CP-1
+- [ ] Đọc dữ liệu nhạy cảm sinh audit (CP-3); dữ liệu nhạy cảm mã hóa, không log/cache
+- [ ] Gợi ý mới có rationale + human-in-the-loop (CP-5/CP-6); cân nhắc bias test (NFR-12)
+- [ ] Rate limiting considered; no new `eval()`/`exec()`/unsafe deserialization
 - [ ] Dependency changes audited (`pip-audit` / `npm audit`)
 
 ### Architecture

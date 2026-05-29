@@ -1,211 +1,158 @@
-# Operations Runbook
+# Operations Runbook — WeUp Career
 
-**Version:** 1.0.0 | **Date:** 2026-05-27  
-**Audience:** Operators, On-call Engineers  
+**Phiên bản:** 2.0.0 | **Ngày:** 2026-05-29
+**Đối tượng:** Operators, On-call Engineers
+**Thay thế:** v1.0.0 (runbook Todo app)
+
+> Lưu ý đặc thù: dữ liệu nhạy cảm (kết quả trắc nghiệm) **mã hóa bằng `FIELD_ENCRYPTION_KEY`**; **audit store append-only** (CP-3); xử lý **yêu cầu chủ thể dữ liệu** & **đồng ý giám hộ** là nghĩa vụ pháp lý. Đường dẫn dữ liệu: `/var/lib/weup`.
 
 ---
 
-## Quick Reference
-
+## Tham chiếu nhanh
 ```bash
-# Service status
 docker compose ps
 docker compose logs -f backend
-docker compose logs -f nginx
-
-# Health checks
 curl http://localhost/api/v1/health
 curl http://localhost/api/v1/ready
-
-# Restart a service
 docker compose restart backend
-
-# Full restart (preserve data)
-docker compose down && docker compose up -d
-
-# Force rebuild (after image update)
-docker compose pull && docker compose up -d
+docker compose down && docker compose up -d        # giữ data
+docker compose pull && docker compose up -d         # cập nhật image
 ```
 
 ---
 
-## Runbook 1: Deploying a New Version
-
+## Runbook 1: Triển khai phiên bản mới
 ```bash
-# 1. Pull latest images
 docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-
-# 2. Graceful rolling restart (downtime < 30s)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps backend
-
-# 3. Run smoke tests
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps backend  # rolling, downtime <30s
 ./scripts/smoke-test.sh
-
-# 4. If smoke tests fail — rollback
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d \
-  --no-deps backend \
+# Nếu fail — rollback:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps backend \
   --image ghcr.io/org/weup-career-backend:PREVIOUS_SHA
-
-# 5. Verify rollback
 ./scripts/smoke-test.sh
 ```
 
 ---
 
-## Runbook 2: Database Recovery
+## Runbook 2: Phục hồi CSDL
 
-### Symptom: Backend returns 503
-
+### Triệu chứng: backend trả 503
 ```bash
-# Check DB file exists
-ls -la /var/lib/todo/data/app.db
-
-# Check DB integrity
-sqlite3 /var/lib/todo/data/app.db "PRAGMA integrity_check;"
-# Expected: "ok"
-
-# If corrupted — restore from backup
-cp /var/lib/todo/backup/app.db.latest /var/lib/todo/data/app.db
+ls -la /var/lib/weup/data/app.db
+sqlite3 /var/lib/weup/data/app.db "PRAGMA integrity_check;"   # mong đợi: ok
+# Nếu hỏng — phục hồi từ backup:
+cp /var/lib/weup/backup/app.db.latest /var/lib/weup/data/app.db
 docker compose restart backend
-
-# Verify
 curl http://localhost/api/v1/ready
 ```
 
-### Symptom: SQLite database locked
+> ⚠️ **Phục hồi DB phải đồng bộ phiên bản với `FIELD_ENCRYPTION_KEY`.** Nếu backup DB cũ hơn lần xoay khóa, kết quả trắc nghiệm nhạy cảm có thể **không giải mã được**. Luôn ghi `key_version` cùng backup (xem Runbook 5).
 
+### Triệu chứng: SQLite locked
 ```bash
-# Identify processes holding the lock
-lsof /var/lib/todo/data/app.db
-
-# If stale lock from crashed process
-docker compose restart backend
+lsof /var/lib/weup/data/app.db
+docker compose restart backend   # nếu là stale lock từ process crash
 ```
 
 ---
 
-## Runbook 3: High 5xx Error Rate
-
+## Runbook 3: Tỉ lệ lỗi 5xx cao
 ```bash
-# 1. Check recent error logs
 docker compose logs --since=15m backend | grep '"level":"error"' | jq .
-
-# 2. Check for OOM kills
 docker stats --no-stream
-docker inspect todo_backend_1 | jq '.[0].State'
-
-# 3. If OOM — increase memory limit in docker-compose.prod.yml
-# Default: 512MB; increase to 1GB
-
-# 4. Restart if process is unhealthy
+docker inspect weup_backend_1 | jq '.[0].State'
+# Nếu OOM — tăng memory limit trong docker-compose.prod.yml (512MB → 1GB)
 docker compose restart backend
-
-# 5. Escalate to on-call if errors persist after restart
 ```
+> ⚠️ Nếu log cho thấy **lỗi ghi audit** khi đọc dữ liệu nhạy cảm: hệ thống **fail-closed** (từ chối đọc để giữ CP-3) — đây là hành vi đúng, **không** vô hiệu hóa audit để "chữa". Điều tra audit store/disk.
 
 ---
 
-## Runbook 4: Rotating JWT Secret Key
-
-**Impact:** All existing access tokens become invalid. All users are logged out.
-
+## Runbook 4: Xoay `SECRET_KEY` (JWT)
+**Tác động:** mọi access token hiện tại vô hiệu; người dùng phải đăng nhập lại.
 ```bash
-# 1. Generate new secret key
-openssl rand -hex 32 > /tmp/new_secret_key.txt
-
-# 2. Update Docker secret
-# (Steps depend on deployment environment)
-# docker-compose: update ./secrets/secret_key.txt
-
-# 3. Restart backend (picks up new secret)
+openssl rand -hex 32 > /var/lib/weup/secrets/secret_key.txt
+chmod 600 /var/lib/weup/secrets/secret_key.txt
 docker compose restart backend
-
-# 4. Verify health
 curl http://localhost/api/v1/health
-
-# 5. Notify users (email / status page)
-# "We've updated our security infrastructure. Please log in again."
+# Thông báo người dùng: "Chúng tôi đã cập nhật bảo mật, vui lòng đăng nhập lại."
 ```
 
 ---
 
-## Runbook 5: Rate Limit False Positives
-
-**Symptom:** Legitimate user getting 429 Too Many Requests
-
+## ⭐ Runbook 5: Xoay `FIELD_ENCRYPTION_KEY` (dữ liệu nhạy cảm)
+**Tác động:** khóa giải mã kết quả trắc nghiệm — **không xoay tùy tiện**. Cần chiến lược re-encrypt versioned.
 ```bash
-# Check rate limit logs
+# 1. Sinh khóa mới + gán key_version mới
+openssl rand -hex 32 > /var/lib/weup/secrets/field_encryption_key.v2.txt
+# 2. Chạy job re-encrypt: giải mã bằng key cũ (theo key_version trên bản ghi) → mã hóa lại bằng key mới
+docker compose exec backend python -m app.tools.reencrypt --from v1 --to v2
+# 3. Xác minh: mọi AssessmentResult đã key_version=v2 và giải mã được
+docker compose exec backend python -m app.tools.verify_encryption --key-version v2
+# 4. Lưu trữ AN TOÀN cả 2 khóa cho tới khi chắc chắn (rollback); chỉ hủy key cũ sau khi verify
+```
+> Khóa lưu ở secret manager/HSM; backup khóa **độc lập** với backup DB nhưng **ghi nhận key_version** để khớp khi phục hồi.
+
+---
+
+## ⭐ Runbook 6: Yêu cầu chủ thể dữ liệu (Luật 91/2025)
+Truy cập / xuất / xóa dữ liệu cá nhân — với trẻ <16 do **người giám hộ** thực hiện.
+```bash
+# Xuất dữ liệu cá nhân của 1 user (gồm kết quả đã giải mã, có audit)
+docker compose exec backend python -m app.tools.export_user --user-id <UUID> --requested-by <actor>
+# Xóa (soft → purge sau cửa sổ khôi phục); ghi audit
+docker compose exec backend python -m app.tools.delete_user --user-id <UUID> --requested-by <actor>
+```
+> Mọi thao tác này **bắt buộc ghi audit** (actor, lý do, thời điểm). Xác minh quyền: chủ thể hoặc giám hộ đã verified.
+
+---
+
+## Runbook 7: Rate limit dương tính giả
+```bash
 docker compose logs --since=15m nginx | grep "limiting requests"
-
-# Temporary workaround — whitelist IP in nginx config
-# Edit nginx/nginx.prod.conf — add to rate limit zone bypass
-
-# Permanent fix: adjust per-user limits in slowapi config
-# Requires backend redeploy
-
-# Check if IP is a NAT (shared IP behind corporate proxy)
-# Consider increasing per-IP limits or using per-user limits
+# NAT/proxy trường học dùng chung IP → cân nhắc per-user limit thay per-IP
+# (trường học là kênh B2B2C — nhiều HS sau 1 IP)
 ```
+> Lưu ý: trường học truy cập đồng loạt (1 lớp làm trắc nghiệm cùng lúc) dễ chạm per-IP limit — ưu tiên **per-user** cho route hướng nghiệp.
 
 ---
 
-## Runbook 6: Backup Procedure
-
+## Runbook 8: Sao lưu
 ```bash
-#!/bin/bash
-# scripts/backup.sh — run daily via cron
-
+#!/bin/bash  # scripts/backup.sh — cron hằng ngày
 DATE=$(date +%Y%m%d-%H%M%S)
-SRC=/var/lib/todo/data/app.db
-BACKUP_DIR=/var/lib/todo/backup
-
-# SQLite hot backup (safe while DB is running due to WAL mode)
+SRC=/var/lib/weup/data/app.db
+BACKUP_DIR=/var/lib/weup/backup
 sqlite3 $SRC ".backup '$BACKUP_DIR/app.db.$DATE'"
-
-# Rotate: keep last 7 daily backups
-ls -t $BACKUP_DIR/app.db.* | tail -n +8 | xargs rm -f
-
-echo "Backup complete: $BACKUP_DIR/app.db.$DATE"
-```
-
-```bash
-# Restore from backup
-cp /var/lib/todo/backup/app.db.YYYYMMDD-HHMMSS /var/lib/todo/data/app.db
-docker compose restart backend
-curl http://localhost/api/v1/ready
+# Ghi kèm key_version hiện hành để khớp khi phục hồi
+cat /var/lib/weup/secrets/field_encryption_key.version > "$BACKUP_DIR/app.db.$DATE.keyver"
+# Backup audit store RIÊNG, immutable
+sqlite3 /var/lib/weup/data/audit.db ".backup '$BACKUP_DIR/audit.db.$DATE'"
+ls -t $BACKUP_DIR/app.db.* | tail -n +8 | xargs rm -f   # giữ 7 bản
 ```
 
 ---
 
-## Monitoring Checklist (Daily)
-
+## Checklist giám sát hằng ngày
 ```bash
-# 1. All services running?
-docker compose ps | grep -v "Up"  # Should return nothing
-
-# 2. Disk usage OK?
-df -h /var/lib/todo/data/
-
-# 3. Any errors in last 24h?
-docker compose logs --since=24h backend | grep '"level":"error"' | wc -l
-# Alert if > 100
-
-# 4. Health endpoints responsive?
-curl -f http://localhost/api/v1/health
-curl -f http://localhost/api/v1/ready
-
-# 5. Backup ran?
-ls -la /var/lib/todo/backup/ | head -5
+docker compose ps | grep -v "Up"                                   # rỗng = ok
+df -h /var/lib/weup/data/
+docker compose logs --since=24h backend | grep '"level":"error"' | wc -l   # alert nếu >100
+curl -f http://localhost/api/v1/health && curl -f http://localhost/api/v1/ready
+ls -la /var/lib/weup/backup/ | head -5
+# Đối chiếu CP-3: sensitive_access_total == audit_writes_total (Prometheus)
+curl -s http://localhost/metrics | grep -E 'sensitive_access_total|audit_writes_total'
 ```
 
 ---
 
-## Alert Thresholds
-
-| Metric | Warning | Critical | Action |
-|--------|---------|----------|--------|
-| 5xx error rate | >0.1% | >1% | Check logs, restart if unresponsive |
-| p99 latency | >500ms | >2000ms | Check DB query times |
-| Memory usage | >400MB | >500MB | Restart backend, check for leak |
-| Disk usage | >70% | >85% | Rotate logs, move old backups |
-| Failed health checks | 2 consecutive | 5 consecutive | Page on-call |
+## Ngưỡng cảnh báo
+| Metric | Warning | Critical | Hành động |
+|---|---|---|---|
+| 5xx rate | >0.1% | >1% | Xem log, restart nếu treo |
+| p99 latency | >500ms | >2000ms | Kiểm tra query DB / [CRED_F4ECCB8A] |
+| Memory | >400MB | >500MB | Restart, kiểm tra leak |
+| Disk | >70% | >85% | Rotate log, dọn backup cũ |
+| Health fail | 2 liên tiếp | 5 liên tiếp | Page on-call |
+| **sensitive_access ≠ audit_writes** | bất kỳ lệch | lệch kéo dài | **Điều tra ngay (vi phạm CP-3)** |
+| **Lỗi ghi audit** | >0 | kéo dài | Fail-closed đang chặn đọc — điều tra audit store |

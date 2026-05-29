@@ -1,6 +1,8 @@
-# Deployment Guide
+# Deployment Guide — WeUp Career
 
-**Version:** 1.0.0 | **Date:** 2026-05-27
+**Version:** 2.0.0 | **Date:** 2026-05-29
+
+> Nền tảng hướng nghiệp quốc gia. Đường dẫn dữ liệu `/var/lib/weup`. Bắt buộc cấu hình `FIELD_ENCRYPTION_KEY` (mã hóa kết quả trắc nghiệm — NFR-10).
 
 ---
 
@@ -25,7 +27,7 @@ cd weup-career
 
 # 2. Copy environment template
 cp .env.example .env
-# Edit .env: set SECRET_KEY to a random value
+# Edit .env: set SECRET_KEY và FIELD_ENCRYPTION_KEY (mỗi cái: openssl rand -hex 32)
 
 # 3. Start all services
 docker compose up --build
@@ -44,7 +46,8 @@ docker compose up --build
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
 | `SECRET_KEY` | Yes | JWT signing key (32+ chars random) | `openssl rand -hex 32` |
-| `DATABASE_URL` | No | SQLAlchemy async URL | `sqlite+aiosqlite:////data/app.db` |
+| `FIELD_ENCRYPTION_KEY` | Yes | Khóa mã hóa trường nhạy cảm (kết quả trắc nghiệm) | `openssl rand -hex 32` |
+| `DATABASE_URL` | No | SQLAlchemy async URL (production: PostgreSQL) | `sqlite+aiosqlite:////data/app.db` |
 | `ENVIRONMENT` | No | `development` / `production` | `production` |
 | `LOG_LEVEL` | No | `debug` / `info` / `warning` | `info` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Access token lifetime | `15` |
@@ -68,8 +71,8 @@ useradd -m -s /bin/bash deploy
 usermod -aG docker deploy
 
 # Create data directory
-mkdir -p /var/lib/todo/{data,backup,certs,secrets}
-chown -R deploy:deploy /var/lib/todo
+mkdir -p /var/lib/weup/{data,backup,secrets,certs}
+chown -R deploy:deploy /var/lib/weup
 ```
 
 ### Step 2: Deploy Application
@@ -80,9 +83,10 @@ cd /home/deploy
 git clone https://github.com/org/weup-career.git
 cd weup-career
 
-# Generate and store secret key
-openssl rand -hex 32 > /var/lib/todo/secrets/secret_key.txt
-chmod 600 /var/lib/todo/secrets/secret_key.txt
+# Generate and store secrets
+openssl rand -hex 32 > /var/lib/weup/secrets/secret_key.txt
+openssl rand -hex 32 > /var/lib/weup/secrets/field_encryption_key.txt
+chmod 600 /var/lib/weup/secrets/*.txt
 
 # Configure production overrides
 cp docker-compose.prod.yml.example docker-compose.prod.yml
@@ -93,7 +97,7 @@ cp docker-compose.prod.yml.example docker-compose.prod.yml
 
 ```bash
 # Using Certbot
-docker run --rm -v /var/lib/todo/certs:/etc/letsencrypt \
+docker run --rm -v /var/lib/weup/certs:/etc/letsencrypt \
   certbot/certbot certonly \
   --standalone \
   --email admin@example.com \
@@ -133,7 +137,7 @@ docker compose exec backend alembic current
 docker compose exec backend alembic downgrade -1
 
 # Create new migration (after model changes)
-docker compose exec backend alembic revision --autogenerate -m "add due_date to todo"
+docker compose exec backend alembic revision --autogenerate -m "add guardian_consent table"
 ```
 
 ---
@@ -163,7 +167,7 @@ docker images ghcr.io/org/weup-career-backend --format "table {{.Tag}}\t{{.Creat
 
 # Rollback to previous SHA
 export PREVIOUS_SHA=sha-a1b2c3d
-sed -i "s|todo-backend:.*|todo-backend:${PREVIOUS_SHA}|" docker-compose.prod.yml
+sed -i "s|weup-career-backend:.*|weup-career-backend:${PREVIOUS_SHA}|" docker-compose.prod.yml
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps backend
 
 # Verify
@@ -193,7 +197,7 @@ curl -sf "$BASE_URL/" | grep -q "<!DOCTYPE html>"
 echo "Testing API reachability..."
 curl -sf "$BASE_URL/api/v1/auth/register" -X POST \
   -H "Content-Type: application/json" \
-  -d '{"email":"smoke@test.local","password":"SecurePass123"}' \
+  -d '{"email":"smoke@test.local","password":"SecurePass123","date_of_birth":"2000-01-01"}' \
   | jq '.email' | grep "smoke@test.local"
 
 echo "All smoke tests passed ✓"

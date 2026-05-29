@@ -7,7 +7,7 @@
 
 ## Decision
 
-Use a multi-layer testing strategy targeting ≥95% meaningful line coverage, with 100% coverage required for auth and data-access layers.
+Use a multi-layer testing strategy targeting ≥95% meaningful line coverage, with **100% coverage required for auth, consent, sensitive-data, và recommendation layers** (đặc thù domain hướng nghiệp). Bổ sung **bias testing** (công bằng AI, NFR-12) và **TLC** (CP-1…CP-8) như gate riêng.
 
 Full details in `docs/testing/strategy.md`. This ADR captures the rationale for key decisions.
 
@@ -27,8 +27,9 @@ Full details in `docs/testing/strategy.md`. This ADR captures the rationale for 
 - `httpx.AsyncClient` is the idiomatic FastAPI testing approach (recommended in official docs)
 
 **Property-based testing with Hypothesis:**
-- 10,000+ cases for auth service (password hashing, token generation)
-- Fuzz todo title/description inputs for SQL injection safety
+- 10,000+ cases cho auth (hashing, token); roundtrip Field Crypto
+- Fuzz input nghề/nội dung cho an toàn SQL injection
+- **Bất biến CP:** CP-1 (không xử lý dữ liệu <16 khi chưa consent), CP-6 (reco luôn có rationale), CP-8 (độ sâu K→A→R không lùi)
 
 **Coverage tool: pytest-cov + coverage.py**
 - `--cov-fail-under=95` enforced in CI

@@ -1,229 +1,184 @@
-# Authentication & Authorization Design
+# Thiết kế Xác thực & Phân quyền — WeUp Career
 
-**Version:** 1.0.0 | **Date:** 2026-05-27
+**Phiên bản:** 2.0.0 | **Ngày:** 2026-05-29
+**Thay thế:** v1.0.0 (auth Todo app)
+
+> Phân quyền của WeUp Career có **ba lớp**: (1) xác thực (JWT), (2) **cổng đồng ý giám hộ** cho dữ liệu trẻ <16, (3) **RBAC quan hệ** (guardian↔child, counselor↔student theo trường). Neo vào [`docs/spec.md`](../spec.md) §8 (CP-1, CP-4, CP-7) và [`docs/legal/legal-basis.md`](../legal/legal-basis.md) §6.
 
 ---
 
-## Authentication Architecture
+## Kiến trúc xác thực
 
-### Token Lifecycle Overview
-
+### Tổng quan vòng đời token
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Token Lifecycle                         │
-│                                                                 │
-│  Register/Login                                                 │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌─────────────────┐     ┌──────────────────────────────┐      │
-│  │  access_token   │     │      refresh_token           │      │
-│  │  (JWT, 15 min)  │     │  (random UUID, 7 days)       │      │
-│  │  in: memory     │     │  in: httpOnly cookie         │      │
-│  │  sent: Bearer   │     │  sent: automatically by      │      │
-│  │  header         │     │  browser on /auth/refresh    │      │
-│  └─────────────────┘     └──────────────────────────────┘      │
-│           │                         │                           │
-│           │ expires in 15min        │ refresh auto-triggered    │
-│           │                         │ 60s before access expiry  │
-│           │                         │                           │
-│           ▼                         ▼                           │
-│       401 response ──────────► Token Rotation                   │
-│                              New access_token +                  │
-│                              New refresh_token issued            │
-│                              Old refresh_token revoked           │
-└─────────────────────────────────────────────────────────────────┘
+Register/Login
+     │
+     ▼
+┌─────────────────┐     ┌──────────────────────────────┐
+│  access_token   │     │      refresh_token           │
+│  (JWT, 15 phút) │     │  (random, 7 ngày)            │
+│  in: memory     │     │  in: httpOnly cookie         │
+│  sent: Bearer   │     │  sent: tự động ở /auth/refresh│
+└─────────────────┘     └──────────────────────────────┘
+        │                         │
+        │ hết hạn 15'             │ tự refresh 60s trước khi access hết hạn
+        ▼                         ▼
+   401 response ──────────► Token Rotation (cũ revoke, mới phát hành — nguyên tử, CP-7)
 ```
 
 ---
 
-## JWT Claims Structure
+## Cấu trúc JWT Claims
 
 ### Access Token
-
 ```json
 {
-  "sub": "usr_01HX...",        // User UUID (subject)
-  "email": "user@example.com", // Denormalized for convenience (no DB lookup)
-  "iat": 1716800000,           // Issued at
-  "exp": 1716800900,           // Expires at (15 min from iat)
-  "jti": "tkn_01HX...",       // JWT ID (unique per token; future blacklist support)
-  "iss": "todo-api"            // Issuer
+  "sub": "usr_01HX...",
+  "email": "user@example.com",
+  "user_type": "student",
+  "age_band": "under_16",
+  "account_status": "active",
+  "roles": ["student"],
+  "iat": 1716800000,
+  "exp": 1716800900,
+  "jti": "tkn_01HX...",
+  "iss": "weup-api"
 }
 ```
-
-**Note:** `email` is included to avoid a DB lookup on every authenticated request. The JWT is verified via signature — no DB round-trip. If a user changes their email, old JWTs will have stale email until expiry (15 min max — acceptable).
-
----
-
-## Password Storage
-
-```
-User input: "MyPassword123"
-     │
-     ▼
-bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12))
-     │
-     ▼
-Stored: "$2b$12$..." (60-char hash string)
-```
-
-**Verification:**
-```python
-bcrypt.checkpw(candidate.encode(), stored_hash.encode())
-# Returns True/False; timing is constant regardless of match
-```
-
-**Why bcrypt (not Argon2id):**
-- bcrypt is well-established and universally supported
-- Argon2id is the modern best-practice; can be adopted in v2 without breaking existing hashes (migrate on next login)
-- passlib handles algorithm negotiation transparently
+> `age_band` + `account_status` đưa vào claim để **Consent Guard** quyết nhanh không cần round-trip DB cho mỗi request; nhưng quyết định cuối về consent vẫn xác thực lại với DB ở route xử lý dữ liệu nhạy cảm (claim có thể cũ tối đa 15'). `roles` hỗ trợ RBAC.
 
 ---
 
-## Refresh Token Rotation
+## Lưu trữ mật khẩu
+```
+"MyPassword123" → bcrypt.hashpw(pw, gensalt(rounds=12)) → "$2b$12$..." (60 ký tự)
+```
+Verify: `bcrypt.checkpw(candidate, stored_hash)` — thời gian hằng số. Có thể nâng Argon2id ở giai đoạn sau (passlib migrate-on-login, không phá hash cũ).
 
+---
+
+## Xoay vòng Refresh Token (CP-7)
 ```
 Client                              Server
-  │                                   │
-  │── POST /auth/refresh ────────────►│
-  │   Cookie: refresh_token=RT_OLD    │
-  │                                   │ 1. Hash RT_OLD → lookup in DB
-  │                                   │ 2. Verify: not revoked, not expired
-  │                                   │ 3. Create RT_NEW (new UUID)
-  │                                   │    and AT_NEW (new JWT)
-  │                                   │ 4. In same transaction:
-  │                                   │    - INSERT RT_NEW (active)
-  │                                   │    - UPDATE RT_OLD SET revoked_at=NOW()
-  │◄── 200 {access_token: AT_NEW} ───│
-  │    Set-Cookie: refresh_token=RT_NEW│
-  │                                   │
+  │── POST /auth/refresh ───────────►│
+  │   Cookie: refresh_token=RT_OLD   │ 1. SHA-256 RT_OLD → lookup
+  │                                  │ 2. Verify: chưa revoke, chưa hết hạn
+  │                                  │ 3. Cùng 1 transaction (nguyên tử):
+  │                                  │    INSERT RT_NEW (active)
+  │                                  │    UPDATE RT_OLD revoked_at=NOW()
+  │◄─ 200 {access_token: AT_NEW} ────│
+  │   Set-Cookie: refresh_token=RT_NEW
 ```
-
-**Re-use detection:** If RT_OLD is presented again after rotation, it is already revoked. This indicates either:
-- A race condition (client sent request twice — benign, second returns 401)
-- Session hijacking (attacker has the old token — treat as compromise)
-
-Future enhancement: on refresh token reuse, revoke **all** refresh tokens for that user.
+**Re-use detection:** RT_OLD trình lại sau rotation → đã revoke → 401. Nâng cấp: phát hiện reuse ⇒ revoke **toàn bộ** refresh token của user (nghi ngờ chiếm phiên).
 
 ---
 
-## Authorization Model
+## ⭐ Lớp 2 — Cổng đồng ý giám hộ (Consent Authorization) — CP-1/CP-2
 
-### Current: Flat RBAC (v1)
-
-All authenticated users have identical permissions over their own resources.
-
-```
-Authenticated User can:
-  ├── CRUD their own todos
-  ├── CRUD their own tags
-  ├── Read/update their own profile
-  └── Change their own password
-
-Authenticated User CANNOT:
-  ├── Access any other user's todos (enforced at repository layer)
-  ├── Access any other user's tags
-  └── See other users exist at all
-```
-
-### Ownership Enforcement (Critical)
-
-Every repository method that reads or modifies a resource includes a `user_id` filter:
+Trước **mọi** route xử lý dữ liệu hướng nghiệp (trắc nghiệm, gợi ý, tiến bộ), một dependency tập trung kiểm tra:
 
 ```python
-# CORRECT — safe
-async def get_todo(self, todo_id: UUID, user_id: UUID) -> Todo | None:
-    result = await self.session.execute(
-        select(TodoModel)
-        .where(TodoModel.id == todo_id)
-        .where(TodoModel.user_id == user_id)   # ← OWNERSHIP CHECK
-        .where(TodoModel.is_deleted == False)
-    )
-    return result.scalar_one_or_none()
-
-# WRONG — never do this
-async def get_todo_unsafe(self, todo_id: UUID) -> Todo | None:
-    # No user_id filter — IDOR vulnerability
-    ...
+async def require_consent(user = Depends(get_current_user),
+                          consents = Depends(get_consent_repo)):
+    if user.age_band != "under_16":
+        return  # ≥16 tự đồng ý
+    active = await consents.has_active(user.id)   # xác thực lại với DB
+    if not active:
+        raise HTTPException(403, code="GUARDIAN_CONSENT_REQUIRED")
 ```
 
-**Defense in depth:** The service layer also checks ownership, but the repository is the final enforcement layer.
+- **Đặt ở tầng router** cho tất cả route dữ liệu hướng nghiệp — một điểm duy nhất, không đường vòng (TLA+ `ConsentLifecycle` chứng minh).
+- Thu hồi consent ⇒ `has_active` trả false ngay ⇒ dừng xử lý mới (CP-2).
+- **Self-consent bị cấm:** trẻ không thể tự đóng vai giám hộ; GuardianLink phải `verified_at` qua kênh độc lập (email/VNeID).
 
 ---
 
-## Session Security Configuration
+## ⭐ Lớp 3 — RBAC quan hệ (CP-4)
+
+Khác v1 (flat RBAC), WeUp Career có nhiều vai trò & quan hệ:
+
+| Vai trò | Được phép | KHÔNG được |
+|---|---|---|
+| `student` (≥16) | CRUD hồ sơ/kết quả/tiến bộ **của mình**; nhận & xác nhận gợi ý | Dữ liệu người khác |
+| `student` (<16) | Như trên **sau khi** có consent active | Xử lý dữ liệu khi chưa consent |
+| `guardian` | Đồng ý/thu hồi; **đồng xem** dữ liệu trẻ **được liên kết & verified** | Dữ liệu trẻ khác |
+| `counselor` | Xem tiến bộ (đã gỡ nhạy cảm theo quyền) & ghi phiên tư vấn cho **học sinh trong school_id của mình** | Học sinh ngoài trường |
+| `school_admin` | Quản lý lớp/HS/counselor trong **school_id** | Dữ liệu cá nhân nhạy cảm chi tiết |
+| `working` | CRUD hồ sơ/kết quả/tiến bộ của mình (lớp phi tuyến) | Dữ liệu người khác |
+
+### Thực thi quyền sở hữu & quan hệ (Critical)
+```python
+def can_access(actor, owner_id) -> bool:
+    return (actor.id == owner_id
+            or guardian_link_verified(actor.id, owner_id)
+            or counselor_of_same_school(actor.id, owner_id))
+
+# Repository LUÔN lọc theo quyền — tầng thực thi cuối
+select(AssessmentResult).where(
+    AssessmentResult.user_id == owner_id)   # + kiểm tra can_access ở service
+```
+**Defense in depth:** service kiểm tra quan hệ; repository lọc `user_id`; trả **404** (không 403) khi không sở hữu để tránh xác nhận tồn tại (trừ trường hợp consent → trả 403 `GUARDIAN_CONSENT_REQUIRED` có chủ đích).
+
+---
+
+## ⭐ Kiểm soát truy cập dữ liệu nhạy cảm (CP-3)
+
+- `AssessmentResult.result_payload` mã hóa at-rest qua **Field Crypto** (khóa `FIELD_ENCRYPTION_KEY`, tách khỏi `SECRET_KEY`).
+- **Mọi lần đọc** kết quả nhạy cảm đi qua một service duy nhất ghi `audit_log(is_sensitive_access=true)` **trong cùng giao dịch** — không có đường đọc nào bỏ qua audit (TLA+ `SensitiveDataAccess`).
+- Không log nội dung; không cache lâu phía client; không index trên nội dung kết quả.
+
+---
+
+## Cấu hình bảo mật phiên
 
 ### Nginx Security Headers
-
 ```nginx
-# Strict Transport Security (HTTPS only)
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-
-# Prevent clickjacking
 add_header X-Frame-Options "DENY" always;
-
-# Prevent MIME type sniffing
 add_header X-Content-Type-Options "nosniff" always;
-
-# Content Security Policy
 add_header Content-Security-Policy "
-  default-src 'self';
-  script-src 'self';
-  style-src 'self' 'unsafe-inline';
-  img-src 'self' data:;
-  connect-src 'self';
-  font-src 'self';
-  object-src 'none';
-  frame-ancestors 'none';
-" always;
-
-# Referrer Policy
+  default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
+  img-src 'self' data:; connect-src 'self'; font-src 'self';
+  object-src 'none'; frame-ancestors 'none';" always;
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-# Permissions Policy
 add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
 ```
 
 ---
 
-## Secret Management
+## Quản lý bí mật (Secret Management)
 
 ### Development
-- `SECRET_KEY` in `.env` (gitignored)
-- `.env.example` shows required variable names without values
+- `SECRET_KEY`, `FIELD_ENCRYPTION_KEY` trong `.env` (gitignored); `.env.example` chỉ tên biến.
 
 ### Production
-- Docker secret mounted at `/run/secrets/secret_key`
-- Application reads from file path, not env var
-- Rotation procedure: update secret file → rolling restart
+- Docker secret tại `/run/secrets/secret_key` và `/run/secrets/field_encryption_key`; app đọc từ file path.
+- **Xoay `FIELD_ENCRYPTION_KEY`** cần chiến lược re-encrypt (versioned key id trên bản ghi) — không xoay tùy tiện vì khóa giải mã dữ liệu nhạy cảm lịch sử.
 
-### Key Generation
+### Sinh khóa
 ```bash
-openssl rand -hex 32   # Generates 256-bit key
+openssl rand -hex 32   # 256-bit
 ```
 
 ---
 
 ## Audit Logging
 
-Every authenticating event produces a log entry with:
+Sự kiện auth + **sự kiện pháp lý/nhạy cảm** đều ghi audit (append-only):
 
 ```json
 {
-  "event": "auth.login.success",
-  "user_id": "usr_01HX...",
-  "ip_address": "1.2.3.4",
-  "user_agent": "Mozilla/5.0...",
+  "event": "assessment.result.read",
+  "actor_id": "usr_01HX...",
+  "target_type": "AssessmentResult",
+  "is_sensitive_access": true,
   "request_id": "req_01HX..."
 }
 ```
 
-Events logged:
-- `auth.register.success` / `auth.register.failed`
-- `auth.login.success` / `auth.login.failed`
-- `auth.logout`
-- `auth.token.refreshed`
-- `auth.token.refresh_failed`
-- `auth.token.reuse_detected` (future: triggers security alert)
-- `user.password_changed`
-- `user.account_deleted`
+Sự kiện được ghi:
+- Auth: `auth.register.*`, `auth.login.*`, `auth.logout`, `auth.token.refreshed`, `auth.token.reuse_detected`
+- Consent: `guardian.invited`, `guardian.consent.granted`, `guardian.consent.revoked`
+- Nhạy cảm (CP-3): `assessment.result.read`, `assessment.result.exported`, `assessment.result.deleted`
+- Gợi ý (giải trình AI): `recommendation.created`, `recommendation.confirmed` (kèm `confirmed_by`, `decision`)
+- Tài khoản: `user.password_changed`, `user.account_deleted`

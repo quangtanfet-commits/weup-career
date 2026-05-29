@@ -1,0 +1,38 @@
+{
+  "runs": [
+    {
+      "scope": "slice-1 (auth + guardian consent)",
+      "timestamp": "2026-05-29T10:30:00Z",
+      "verdict": "ship (slice-1 scope)",
+      "aggregate": 96.2,
+      "note": "auth-session + registration + guardian-consent state machine PASS trên app chạy thật (uvicorn+curl)."
+    },
+    {
+      "scope": "slice-2 (assessment.feature)",
+      "timestamp": "2026-05-29T12:40:00Z",
+      "artifact": "backend/ @ feat/phase2-assessments — in-process ASGI (real app/DB/guard/crypto/audit)",
+      "tainted": false,
+      "holdout_integrity": "coder không truy cập scenarios/ (chỉ thị + git xác nhận)",
+      "exec_note": "Dùng in-process ASGI thay uvicorn/TCP do sandbox process-flakiness; phải SEED instrument thủ công (gap G-1).",
+      "checks": {
+        "CP-1_submit_without_consent_403": {"score": 100, "evidence": "HTTP 403 GUARDIAN_CONSENT_REQUIRED trước consent"},
+        "A-S6_three_instruments": {"score": 100, "evidence": "GET /assessments → [mbti,riasec,vips]"},
+        "A-S1_submit_201_v1_sensitive": {"score": 100, "evidence": "HTTP 201, version=1, is_sensitive=true"},
+        "A-S1_ack_hides_payload": {"score": 100, "evidence": "submit-ack chỉ metadata"},
+        "CP-3_read_writes_one_audit": {"score": 100, "evidence": "audit is_sensitive_access 0->1 sau 1 GET"},
+        "A-S1_explanation_not_forced_job": {"score": 95, "evidence": "payload có scores+code (Holland), không ép 1 nghề"},
+        "A-S2_encrypted_at_rest": {"score": 100, "evidence": "result_payload prefix 'v1:...', không plaintext"},
+        "A-S4_cross_user_404": {"score": 100, "evidence": "user khác GET -> 404"},
+        "A-S5_versioned": {"score": 100, "evidence": "resubmit -> version=2, 2 rows"},
+        "FR-14_delete_own_result": {"score": 100, "evidence": "DELETE 204 -> GET 404"}
+      },
+      "not_independently_exercised": ["A-S7 log-no-sensitive-content (phủ bởi FF-10 unit test)"],
+      "aggregate": 99.5,
+      "scenarios_below_60": 0,
+      "verdict": "ship — G-1 closed",
+      "gaps": {
+        "G-1": "CLOSED: thêm seed_instruments() idempotent + CLI `python -m app.assessments.seed`, wire docker-entrypoint. Verify deploy-flow (alembic→seed→uvicorn): submit fresh DB = 201 (trước 404); re-run seed không nhân đôi."
+      }
+    }
+  ]
+}

@@ -1,6 +1,8 @@
-# Deployment Architecture
+# Deployment Architecture — WeUp Career
 
-**Version:** 1.0.0 | **Date:** 2026-05-27
+**Version:** 2.0.0 | **Date:** 2026-05-29
+
+> Hạ tầng cho nền tảng hướng nghiệp quốc gia. Lưu ý dữ liệu nhạy cảm (kết quả RIASEC/VIPS/MBTI) cần khóa mã hóa trường (`FIELD_ENCRYPTION_KEY`) và ưu tiên PostgreSQL ở production (xem [`docs/scalability/strategy.md`](../scalability/strategy.md)). CI bao gồm gate **bias test** + **TLC** (spec.md §7 Gate B).
 
 ---
 
@@ -130,9 +132,10 @@ services:
     environment:
       - DATABASE_URL=sqlite+aiosqlite:////data/app.db
       - SECRET_KEY_FILE=/run/secrets/secret_key
+      - FIELD_ENCRYPTION_KEY_FILE=/run/secrets/field_encryption_key  # mã hóa kết quả trắc nghiệm (NFR-10)
       - ENVIRONMENT=production
       - LOG_LEVEL=info
-    secrets: [secret_key]
+    secrets: [secret_key, field_encryption_key]
     restart: unless-stopped
     deploy:
       resources:
@@ -149,6 +152,8 @@ volumes:
 secrets:
   secret_key:
     file: ./secrets/secret_key.txt
+  field_encryption_key:
+    file: ./secrets/field_encryption_key.txt
 ```
 
 ---
@@ -164,10 +169,12 @@ graph LR
     subgraph "GitHub Actions"
         subgraph "PR Gate (parallel)"
             LINT["Lint & Type Check\n• mypy --strict\n• ESLint + tsc"]
-            TEST_BE["Backend Tests\n• pytest\n• coverage ≥95%"]
+            TEST_BE["Backend Tests\n• pytest\n• coverage ≥95%\n• 100% auth/consent/sensitive/reco"]
             TEST_FE["Frontend Tests\n• vitest\n• coverage ≥95%"]
             SEC["Security Scan\n• Trivy (images)\n• Semgrep\n• pip-audit\n• npm audit"]
             E2E["E2E Tests\n• Playwright\n• 3 browsers"]
+            BIAS["Bias Test\n• công bằng giới/vùng/hoàn cảnh\n(RIASEC/MBTI + reco)"]
+            TLC["TLC Model Check\n• Consent/Reco/Auth/Progress\n(nếu đổi state machine)"]
         end
 
         GATE{"All gates\npassed?"}
@@ -183,8 +190,8 @@ graph LR
         DEPLOY_PROD["Deploy production\n(manual approval gate)"]
     end
 
-    PUSH --> LINT & TEST_BE & TEST_FE & SEC & E2E
-    LINT & TEST_BE & TEST_FE & SEC & E2E --> GATE
+    PUSH --> LINT & TEST_BE & TEST_FE & SEC & E2E & BIAS & TLC
+    LINT & TEST_BE & TEST_FE & SEC & E2E & BIAS & TLC --> GATE
     GATE -->|Yes| BUILD
     BUILD --> PUSH_REG --> DEPLOY_STG --> SMOKE
     SMOKE --> RELEASE

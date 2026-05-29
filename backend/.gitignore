@@ -1,0 +1,17 @@
+# Backend-local ignores (root .gitignore covers most of these too).
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+data/
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.*
+!.env.example

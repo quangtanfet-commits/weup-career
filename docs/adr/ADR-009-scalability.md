@@ -30,7 +30,7 @@ Nginx (1) → Gunicorn (4 workers × Uvicorn) → SQLite (WAL)
 
 - Handles: ~200 concurrent users, ~400 req/s reads
 - SQLite WAL allows concurrent reads across all workers
-- Write serialization still exists; typically not the bottleneck for todo workloads
+- Write serialization vẫn còn; thường không phải bottleneck ở quy mô MVP (đọc nhiều: thư viện nghề, tiến bộ). Quy mô quốc gia → PostgreSQL (Phase 3)
 
 ### Phase 3: Multi-node (database migration trigger)
 

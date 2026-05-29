@@ -19,6 +19,22 @@ env:
 # ─── JOBS RUN IN PARALLEL ─────────────────────────────────────
 jobs:
 
+  # ── 0. Detect frontend (gate full-stack jobs until frontend exists) ──
+  detect:
+    name: "Detect frontend"
+    runs-on: ubuntu-latest
+    outputs:
+      has_frontend: ${{ steps.c.outputs.has_frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: c
+        run: |
+          if [ -f frontend/package-lock.json ]; then
+            echo "has_frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_frontend=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # ── 1. Backend — Lint & Type Check ──────────────────────────
   lint-backend:
     name: "🔍 Backend Lint & Types"
@@ -63,7 +79,8 @@ jobs:
     name: "🔍 Frontend Lint & Types"
     runs-on: ubuntu-latest
     # Skip until the frontend is scaffolded (backend-only slices ship first).
-    if: ${{ hashFiles('frontend/package-lock.json') != '' }}
+    needs: [detect]
+    if: ${{ needs.detect.outputs.has_frontend == 'true' }}
     defaults:
       run:
         working-directory: frontend
@@ -140,8 +157,8 @@ jobs:
   test-frontend:
     name: "🧪 Frontend Tests"
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('frontend/package-lock.json') != '' }}
-    needs: [lint-frontend]
+    if: ${{ needs.detect.outputs.has_frontend == 'true' }}
+    needs: [detect, lint-frontend]
     defaults:
       run:
         working-directory: frontend
@@ -282,8 +299,8 @@ jobs:
   e2e:
     name: "🎭 E2E Tests — ${{ matrix.browser }}"
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('frontend/package-lock.json') != '' }}
-    needs: [test-backend, test-frontend]
+    if: ${{ needs.detect.outputs.has_frontend == 'true' }}
+    needs: [detect, test-backend, test-frontend]
     strategy:
       fail-fast: false
       matrix:
@@ -339,8 +356,8 @@ jobs:
     name: "🐳 Build & Scan Images"
     runs-on: ubuntu-latest
     # Needs the frontend image; skip until frontend exists.
-    if: ${{ hashFiles('frontend/package-lock.json') != '' }}
-    needs: [lint-backend, lint-frontend]
+    if: ${{ needs.detect.outputs.has_frontend == 'true' }}
+    needs: [detect, lint-backend, lint-frontend]
     permissions:
       contents: read
       packages: write

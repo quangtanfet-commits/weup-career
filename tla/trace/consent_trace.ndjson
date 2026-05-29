@@ -1,0 +1,3 @@
+{"event":"GrantConsent","user":"c1","state":{"consent":"active"}}
+{"event":"RevokeConsent","user":"c1","state":{"consent":"revoked"}}
+{"event":"GrantConsent","user":"c1","state":{"consent":"active"}}

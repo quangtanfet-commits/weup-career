@@ -25,6 +25,7 @@ from app.core.exceptions import (
     SelfConsentError,
 )
 from app.core.models import new_uuid, utcnow
+from app.core.trace import emit as trace_emit
 from app.guardians.models import GuardianConsent, GuardianLink
 from app.guardians.repository import IGuardianRepo
 from app.guardians.schemas import InviteRequest
@@ -112,6 +113,8 @@ class GuardianService:
             target_type="GuardianConsent",
             target_id=consent.id,
         )
+        # Gate B conformance trace: spec action GrantConsent (consent → active).
+        trace_emit("GrantConsent", user=link.child_user_id, state={"consent": "active"})
         return consent
 
     async def revoke_consent(
@@ -141,3 +144,5 @@ class GuardianService:
             target_type="GuardianConsent",
             target_id=consent.id,
         )
+        # Gate B conformance trace: spec action RevokeConsent (consent → revoked).
+        trace_emit("RevokeConsent", user=child_user_id, state={"consent": "revoked"})

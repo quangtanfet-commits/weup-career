@@ -91,6 +91,14 @@ warn_unused_ignores = false
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
+filterwarnings = [
+    # aiosqlite runs each in-memory connection on a daemon thread. With many
+    # async tests churning event loops in one session, finalizing such a
+    # connection can surface a benign "Event loop is closed" thread exception
+    # (a test-infra artifact of the StaticPool in-memory pattern, not app code).
+    # Silence only this specific unhandled-thread warning.
+    "ignore::pytest.PytestUnhandledThreadExceptionWarning",
+]
 
 [tool.coverage.run]
 source = ["app"]

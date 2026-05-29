@@ -101,6 +101,17 @@ async def seeded_instruments(db: Database) -> dict[str, str]:
 
 
 @pytest_asyncio.fixture
+async def seeded_competencies(db: Database) -> dict[str, str]:
+    """Seed the 12-competency tree + indicators; return {code: competency_id}."""
+    from app.competency.seed import seed_competencies as _seed
+
+    async with db.session_factory() as s:
+        ids = await _seed(s)
+        await s.commit()
+    return ids
+
+
+@pytest_asyncio.fixture
 async def client(settings: Settings, db: Database) -> AsyncGenerator[AsyncClient, None]:
     app = create_app(settings)
     app.state.db = db

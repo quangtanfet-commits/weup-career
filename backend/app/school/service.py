@@ -27,17 +27,18 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+from app.auth.repository import IUserRepo
 from app.competency.service import CompetencyProgress, CompetencyService
 from app.core.audit import IAuditRepo
 from app.core.authz import can_access
 from app.core.crypto import FieldCrypto
-from app.core.enums import CounselingTier, InstrumentType
+from app.core.enums import CounselingTier, InstrumentType, SchoolRole
 from app.core.exceptions import NotFoundError
 from app.core.models import new_uuid
 from app.core.trace import emit as trace_emit
 from app.guardians.repository import IGuardianRepo
 from app.reco.repository import IRecoRepo
-from app.school.models import CounselingSession
+from app.school.models import CounselingSession, SchoolClass, SchoolMembership
 from app.school.repository import ISchoolRepo
 
 
@@ -82,6 +83,7 @@ class SchoolService:
         reco: IRecoRepo,
         audit: IAuditRepo,
         crypto: FieldCrypto,
+        users: IUserRepo,
     ) -> None:
         self._school = school
         self._guardians = guardians
@@ -89,6 +91,7 @@ class SchoolService:
         self._reco = reco
         self._audit = audit
         self._crypto = crypto
+        self._users = users
 
     # -- CP-4 relational hook ---------------------------------------------
 
@@ -126,6 +129,97 @@ class SchoolService:
             RosterEntry(user_id=user.id, email=user.email, class_id=membership.class_id)
             for user, membership in rows
         ]
+
+    # -- school_admin write CRUD (FR-80, G-7, CP-4 spirit) -----------------
+
+    async def _require_admin(self, *, actor_id: str, school_id: str) -> None:
+        """Authorise a school_admin OF this school, else 404 (existence-hiding).
+
+        Authority is re-derived from ``SchoolMembership`` (never the JWT). A
+        non-admin, or an admin of a DIFFERENT school, is told the school does
+        not exist (404) rather than 403, per auth-design.md — a school_admin can
+        never manage a school they do not administer.
+        """
+        admin = await self._school.admin_membership(user_id=actor_id, school_id=school_id)
+        if admin is None:
+            raise NotFoundError("Không tìm thấy trường")
+
+    async def create_class(
+        self, *, actor_id: str, school_id: str, name: str, grade: str
+    ) -> SchoolClass:
+        """Create a class in ``school_id`` (FR-80). Admin-of-this-school only."""
+        await self._require_admin(actor_id=actor_id, school_id=school_id)
+        klass = await self._school.add_class(
+            SchoolClass(id=new_uuid(), school_id=school_id, name=name, grade=grade)
+        )
+        await self._audit.record(
+            action="school.class.created",
+            actor_id=actor_id,
+            target_type="SchoolClass",
+            target_id=klass.id,
+        )
+        return klass
+
+    async def list_classes(self, *, actor_id: str, school_id: str) -> list[SchoolClass]:
+        """List classes of ``school_id`` (FR-80).
+
+        Authorised for a school_admin OR counselor of that school (same gate as
+        the roster read); anyone else → 404.
+        """
+        staff = await self._school.staff_membership(user_id=actor_id, school_id=school_id)
+        if staff is None:
+            raise NotFoundError("Không tìm thấy trường")
+        return await self._school.list_classes(school_id=school_id)
+
+    async def assign_member(
+        self,
+        *,
+        actor_id: str,
+        school_id: str,
+        user_id: str,
+        role: SchoolRole,
+        class_id: str | None = None,
+    ) -> tuple[SchoolMembership, bool]:
+        """Enroll/assign ``user_id`` as student or counselor in ``school_id``.
+
+        Admin-of-this-school only (FR-80). Returns ``(membership, created)``;
+        idempotent on the ``(user, school, role)`` unique constraint — assigning
+        an already-assigned (user, role) returns the existing row with
+        ``created=False`` instead of crashing on the duplicate. The target user
+        must exist (else 404). Only ``student``/``counselor`` may be assigned via
+        this flow (assigning another admin is out of scope).
+        """
+        await self._require_admin(actor_id=actor_id, school_id=school_id)
+
+        if role not in (SchoolRole.STUDENT, SchoolRole.COUNSELOR):
+            raise NotFoundError("Vai trò không hợp lệ cho luồng phân công")
+
+        target = await self._users.get_by_id(user_id)
+        if target is None:
+            raise NotFoundError("Không tìm thấy người dùng")
+
+        existing = await self._school.get_membership(
+            user_id=user_id, school_id=school_id, role=role
+        )
+        if existing is not None:
+            return existing, False
+
+        membership = await self._school.add_membership(
+            SchoolMembership(
+                id=new_uuid(),
+                user_id=user_id,
+                school_id=school_id,
+                role=role,
+                class_id=class_id,
+            )
+        )
+        await self._audit.record(
+            action="school.member.assigned",
+            actor_id=actor_id,
+            target_type="SchoolMembership",
+            target_id=membership.id,
+        )
+        return membership, True
 
     # -- counselling sessions (FR-81/82) -----------------------------------
 

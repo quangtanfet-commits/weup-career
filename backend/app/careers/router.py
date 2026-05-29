@@ -17,10 +17,20 @@ data and *do* pass the consent gate.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, status
 
-from app.api.deps import CurrentUser, career_service, get_current_user
-from app.careers.schemas import CareerDetailOut, CareerSummaryOut, ContentItemOut
+from app.api.deps import (
+    CurrentUser,
+    career_service,
+    get_current_user,
+    require_content_editor,
+)
+from app.careers.schemas import (
+    CareerDetailOut,
+    CareerSummaryOut,
+    ContentItemOut,
+    CreateContentRequest,
+)
 from app.careers.service import CareerService
 from app.core.enums import (
     ContentStatus,
@@ -84,3 +94,48 @@ async def list_content(
         status=status,
     )
     return [ContentItemOut.from_model(c) for c in items]
+
+
+# -- content_editor management (FR-90) ------------------------------------
+# Global/internal content_editor only (re-derived from User.is_content_editor);
+# a non-editor → 403. Public GET /content above stays Bearer-only.
+
+
+@router.post(
+    "/content",
+    response_model=ContentItemOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_content(
+    payload: CreateContentRequest,
+    current: CurrentUser = Depends(require_content_editor),
+    service: CareerService = Depends(career_service),
+) -> ContentItemOut:
+    item = await service.create_content(editor_id=current.id, draft=payload.to_draft())
+    return ContentItemOut.from_model(item)
+
+
+@router.get("/content/{content_id}", response_model=ContentItemOut)
+async def get_content_item(
+    content_id: str = Path(...),
+    current: CurrentUser = Depends(require_content_editor),
+    service: CareerService = Depends(career_service),
+) -> ContentItemOut:
+    """Fetch a specific content row by id, any status (editor traceability)."""
+    item = await service.get_content_item(content_id)
+    return ContentItemOut.from_model(item)
+
+
+@router.post(
+    "/content/{content_id}/versions",
+    response_model=ContentItemOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def publish_content_version(
+    content_id: str = Path(...),
+    current: CurrentUser = Depends(require_content_editor),
+    service: CareerService = Depends(career_service),
+) -> ContentItemOut:
+    """Publish a new version; the prior published version is archived (FR-90)."""
+    item = await service.publish_new_version(editor_id=current.id, content_id=content_id)
+    return ContentItemOut.from_model(item)

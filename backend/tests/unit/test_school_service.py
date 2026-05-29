@@ -206,6 +206,7 @@ async def test_desensitized_view_vips_exposes_presence_only(
         reco=SqlRecoRepo(session),
         audit=audit,
         crypto=crypto,
+        users=SqlUserRepo(session),
     )
     # Owner reads own data (can_access True via actor==owner) → VIPS code None,
     # so the VIPS branch returns presence-only without decrypting a "code".

@@ -25,7 +25,7 @@ from app.core.config import Settings, get_settings
 from app.core.consent import require_consent
 from app.core.crypto import FieldCrypto
 from app.core.database import Database
-from app.core.exceptions import AuthenticationError
+from app.core.exceptions import AuthenticationError, PermissionDeniedError
 from app.core.security import decode_access_token
 from app.guardians.repository import SqlGuardianRepo
 from app.guardians.service import GuardianService
@@ -33,6 +33,8 @@ from app.reco.repository import SqlRecoRepo
 from app.reco.service import RecoService
 from app.school.repository import SqlSchoolRepo
 from app.school.service import SchoolService
+from app.wellbeing.repository import SqlWellbeingRepo
+from app.wellbeing.service import WellbeingService
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -106,6 +108,10 @@ def school_repo(session: AsyncSession = Depends(get_session)) -> SqlSchoolRepo:
     return SqlSchoolRepo(session)
 
 
+def wellbeing_repo(session: AsyncSession = Depends(get_session)) -> SqlWellbeingRepo:
+    return SqlWellbeingRepo(session)
+
+
 def field_crypto(settings: Settings = Depends(settings_dep)) -> FieldCrypto:
     return FieldCrypto(settings.field_encryption_key)
 
@@ -156,8 +162,9 @@ def competency_service(
 
 def career_service(
     careers: SqlCareerRepo = Depends(career_repo),
+    audit: SqlAuditRepo = Depends(audit_repo),
 ) -> CareerService:
-    return CareerService(careers=careers)
+    return CareerService(careers=careers, audit=audit)
 
 
 def reco_service(
@@ -183,6 +190,7 @@ def school_service(
     recos: SqlRecoRepo = Depends(reco_repo),
     audit: SqlAuditRepo = Depends(audit_repo),
     crypto: FieldCrypto = Depends(field_crypto),
+    users: SqlUserRepo = Depends(user_repo),
 ) -> SchoolService:
     return SchoolService(
         school=schools,
@@ -191,6 +199,19 @@ def school_service(
         reco=recos,
         audit=audit,
         crypto=crypto,
+        users=users,
+    )
+
+
+def wellbeing_service(
+    wellbeing: SqlWellbeingRepo = Depends(wellbeing_repo),
+    audit: SqlAuditRepo = Depends(audit_repo),
+    schools: SqlSchoolRepo = Depends(school_repo),
+) -> WellbeingService:
+    return WellbeingService(
+        wellbeing=wellbeing,
+        audit=audit,
+        find_counselor=schools.find_counselor_for_student,
     )
 
 
@@ -212,6 +233,22 @@ async def get_current_user(
         account_status=str(claims.get("account_status", "")),
         roles=list(claims.get("roles", [])),
     )
+
+
+async def require_content_editor(
+    current: CurrentUser = Depends(get_current_user),
+    users: SqlUserRepo = Depends(user_repo),
+) -> CurrentUser:
+    """Authorise a global content_editor (FR-90), re-derived from the DB.
+
+    The JWT ``roles`` claim is only a hint; authority is re-validated against
+    ``User.is_content_editor`` per request (a claim can be up to 15' stale, and
+    a revoked editor must lose access immediately). A non-editor → 403.
+    """
+    user = await users.get_by_id(current.id)
+    if user is None or not user.is_content_editor:
+        raise PermissionDeniedError("Chỉ biên tập viên nội dung mới được thực hiện")
+    return current
 
 
 async def require_career_data_consent(

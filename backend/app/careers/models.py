@@ -129,6 +129,7 @@ class ContentItem(UUIDMixin, Base):
             "school_level",
         ),
         Index("ix_content_item_status", "status"),
+        Index("ix_content_item_lineage", "lineage_id"),
     )
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -143,3 +144,10 @@ class ContentItem(UUIDMixin, Base):
         Enum(ContentStatus), nullable=False, default=ContentStatus.PUBLISHED
     )
     source_ref: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    # Version lineage (FR-90 supersession). All versions of one logical content
+    # unit share a ``lineage_id`` (the v1 row's id). Publishing a new version
+    # inserts a new row in the same lineage (version = prev+1, status=published)
+    # and archives the prior published row — old versions stay in the DB and are
+    # still fetchable by id (traceability, NFR-26). Nullable for legacy/seed
+    # rows that pre-date lineage tracking; those are treated as their own lineage.
+    lineage_id: Mapped[str | None] = mapped_column(String(36), nullable=True)

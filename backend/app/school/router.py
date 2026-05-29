@@ -23,14 +23,79 @@ from fastapi import APIRouter, Depends, Path, status
 
 from app.api.deps import CurrentUser, get_current_user, school_service
 from app.school.schemas import (
+    AssignMemberRequest,
     CounselingSessionOut,
+    CreateClassRequest,
     CreateSessionRequest,
+    MembershipOut,
     RosterEntryOut,
+    SchoolClassOut,
     StudentProgressOut,
 )
 from app.school.service import SchoolService
 
 router = APIRouter(tags=["school"])
+
+
+# -- school_admin write CRUD (FR-80, G-7) ---------------------------------
+# Authorised to a school_admin OF the given school only; authority is
+# re-derived from SchoolMembership (never the JWT). A non-admin, or an admin of
+# another school, gets 404 (existence-hiding) — never crosses school boundaries.
+
+
+@router.post(
+    "/school/{school_id}/classes",
+    response_model=SchoolClassOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_class(
+    payload: CreateClassRequest,
+    school_id: str = Path(...),
+    current: CurrentUser = Depends(get_current_user),
+    service: SchoolService = Depends(school_service),
+) -> SchoolClassOut:
+    klass = await service.create_class(
+        actor_id=current.id, school_id=school_id, name=payload.name, grade=payload.grade
+    )
+    return SchoolClassOut.from_model(klass)
+
+
+@router.get("/school/{school_id}/classes", response_model=list[SchoolClassOut])
+async def list_classes(
+    school_id: str = Path(...),
+    current: CurrentUser = Depends(get_current_user),
+    service: SchoolService = Depends(school_service),
+) -> list[SchoolClassOut]:
+    classes = await service.list_classes(actor_id=current.id, school_id=school_id)
+    return [SchoolClassOut.from_model(k) for k in classes]
+
+
+@router.post(
+    "/school/{school_id}/members",
+    response_model=MembershipOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def assign_member(
+    payload: AssignMemberRequest,
+    school_id: str = Path(...),
+    current: CurrentUser = Depends(get_current_user),
+    service: SchoolService = Depends(school_service),
+) -> MembershipOut:
+    membership, created = await service.assign_member(
+        actor_id=current.id,
+        school_id=school_id,
+        user_id=payload.user_id,
+        role=payload.role,
+        class_id=payload.class_id,
+    )
+    return MembershipOut(
+        id=membership.id,
+        user_id=membership.user_id,
+        school_id=membership.school_id,
+        role=membership.role,
+        class_id=membership.class_id,
+        created=created,
+    )
 
 
 @router.get("/school/{school_id}/students", response_model=list[RosterEntryOut])

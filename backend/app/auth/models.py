@@ -37,6 +37,11 @@ class User(UUIDMixin, TimestampMixin, Base):
     )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Global/internal content-editor capability (spec §2 "Nội bộ", FR-90). NOT
+    # school-scoped: a content_editor manages the versioned public content
+    # library system-wide. Minimal, auditable flag (default off) rather than a
+    # separate global-role table — only an operator/seed grants it.
+    is_content_editor: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class RefreshToken(UUIDMixin, Base):

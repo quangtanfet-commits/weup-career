@@ -17,5 +17,8 @@ python -m app.careers.seed
 echo "[entrypoint] seeding demo school (idempotent)"
 python -m app.school.seed
 
+echo "[entrypoint] seeding wellbeing content (idempotent)"
+python -m app.wellbeing.seed
+
 echo "[entrypoint] starting: $*"
 exec "$@"

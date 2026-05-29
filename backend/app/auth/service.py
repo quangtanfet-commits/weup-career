@@ -45,7 +45,12 @@ class IssuedTokens:
 
 def _roles_for(user: User) -> list[str]:
     base = Role.WORKING if user.user_type == UserType.WORKING else Role.STUDENT
-    return [base.value]
+    roles = [base.value]
+    # Global content-editor capability (FR-90). The claim is a fast hint; the
+    # content routes still re-derive authority from the DB flag per request.
+    if user.is_content_editor:
+        roles.append(Role.CONTENT_EDITOR.value)
+    return roles
 
 
 class AuthService:

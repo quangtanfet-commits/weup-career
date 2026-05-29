@@ -99,9 +99,7 @@ class SchoolService:
         ``can_access(counselor_check=...)`` so the guardian↔child path is reused
         untouched and counselor↔student is the only thing this slice adds.
         """
-        return await self._school.has_counselor_access(
-            counselor_id=actor_id, student_id=owner_id
-        )
+        return await self._school.has_counselor_access(counselor_id=actor_id, student_id=owner_id)
 
     async def _can_access(self, *, actor_id: str, owner_id: str) -> bool:
         return await can_access(

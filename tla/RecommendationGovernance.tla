@@ -1,0 +1,40 @@
+------------------------- MODULE RecommendationGovernance -----------------------
+(* CP-5 (human-in-the-loop) + CP-6 (luôn có rationale). spec.md §8.           *)
+CONSTANTS RecIds, Humans
+
+VARIABLE recs   \* [RecIds -> [rationale: BOOLEAN, status, confirmedBy]]
+vars == <<recs>>
+
+RecStatus == {"absent", "proposed", "accepted", "rejected", "deferred"}
+RecRecord == [rationale: BOOLEAN, status: RecStatus, confirmedBy: Humans \cup {"none"}]
+
+TypeOK == recs \in [RecIds -> RecRecord]
+
+Init == recs = [r \in RecIds |-> [rationale |-> FALSE, status |-> "absent", confirmedBy |-> "none"]]
+
+\* Tạo gợi ý: BẮT BUỘC rationale = TRUE (CP-6); trạng thái proposed; chưa ai xác nhận
+Create(r) ==
+  /\ recs[r].status = "absent"
+  /\ recs' = [recs EXCEPT ![r] = [rationale |-> TRUE, status |-> "proposed", confirmedBy |-> "none"]]
+
+\* Chỉ CON NGƯỜI mới chuyển trạng thái sang có hiệu lực (CP-5)
+Confirm(r, h, d) ==
+  /\ recs[r].status = "proposed"
+  /\ h \in Humans
+  /\ d \in {"accepted", "rejected", "deferred"}
+  /\ recs' = [recs EXCEPT ![r].status = d, ![r].confirmedBy = h]
+
+Next ==
+  \/ \E r \in RecIds : Create(r)
+  \/ \E r \in RecIds, h \in Humans, d \in {"accepted","rejected","deferred"} : Confirm(r, h, d)
+
+Spec == Init /\ [][Next]_vars
+
+\* CP-6: gợi ý đã tồn tại luôn có rationale
+RationaleAlways == \A r \in RecIds : recs[r].status # "absent" => recs[r].rationale = TRUE
+
+\* CP-5: trạng thái có hiệu lực phải do con người xác nhận
+HumanInTheLoop ==
+  \A r \in RecIds : recs[r].status \in {"accepted","rejected","deferred"}
+                      => recs[r].confirmedBy \in Humans
+==================================================================================

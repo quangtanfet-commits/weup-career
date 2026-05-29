@@ -214,7 +214,12 @@ jobs:
             tla/**/*.tla
             tla/**/*.cfg
             backend/app/auth/**
-            backend/app/todos/**
+            backend/app/guardians/**
+            backend/app/assessments/**
+            backend/app/reco/**
+            backend/app/competency/**
+            backend/app/core/consent.py
+            backend/app/core/audit.py
 
       - name: Download TLA+ tools
         if: steps.tla-changed.outputs.any_changed == 'true'
@@ -222,21 +227,61 @@ jobs:
           wget -q https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar \
             -O /tmp/tla2tools.jar
 
-      - name: Run TLC — TodoStateMachine
+      - name: Run TLC — tất cả module (CP-1…CP-8)
         if: steps.tla-changed.outputs.any_changed == 'true'
         run: |
-          java -jar /tmp/tla2tools.jar \
-            -config tla/TodoStateMachine.cfg \
-            tla/TodoStateMachine.tla 2>&1 | tee tla-todo.log
-          grep -q "Model checking completed" tla-todo.log
+          for m in ConsentLifecycle SensitiveDataAccess AuthorizationModel \
+                   RecommendationGovernance AuthTokenLifecycle CompetencyProgress; do
+            echo "=== TLC: $m ==="
+            java -jar /tmp/tla2tools.jar \
+              -config "tla/$m.cfg" "tla/$m.tla" 2>&1 | tee "tla-$m.log"
+            grep -q "Model checking completed" "tla-$m.log"
+          done
 
-      - name: Run TLC — AuthTokenLifecycle
-        if: steps.tla-changed.outputs.any_changed == 'true'
+  # ── 6b. Bias / [CRED_C5DB6C42] Test (AI fairness) — Luật 134/2025, NFR-12 ───
+  bias-test:
+    name: "⚖️  Bias / [CRED_C5DB6C42] Test"
+    runs-on: ubuntu-latest
+    # Chỉ chạy khi đụng engine gợi ý / [CRED_E1311C5D] (kích hoạt khi code xuất hiện)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if recommendation/assessment code changed
+        id: bias-changed
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            backend/app/reco/**
+            backend/app/assessments/**
+            backend/tests/bias/**
+
+      - uses: actions/setup-python@v5
+        if: steps.bias-changed.outputs.any_changed == 'true'
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Run bias test suite (HARD GATE — không nới ngưỡng)
+        if: steps.bias-changed.outputs.any_changed == 'true'
+        working-directory: backend
         run: |
-          java -jar /tmp/tla2tools.jar \
-            -config tla/AuthTokenLifecycle.cfg \
-            tla/AuthTokenLifecycle.tla 2>&1 | tee tla-auth.log
-          grep -q "Model checking completed" tla-auth.log
+          # Khung: docs/testing/bias-testing.md (M1..M5, DIR≥0.80, counterfactual≥99%)
+          if [ ! -d tests/bias ]; then
+            echo "❌ P-1: code engine gợi ý/[CRED_E1311C5D] thay đổi nhưng THIẾU bộ bias test (tests/bias/)."
+            echo "   Bắt buộc theo NFR-12 + Luật 134/2025. Xem docs/testing/bias-testing.md."
+            exit 1
+          fi
+          pip install uv && uv pip install --system -e ".[test]"
+          pytest tests/bias/ -v
+          # Đính kèm báo cáo công bằng cho release (Gate C)
+          python -m tests.bias.report --out bias-report.json
+
+      - name: Upload bias report
+        if: steps.bias-changed.outputs.any_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bias-report
+          path: backend/bias-report.json
+          if-no-files-found: ignore
 
   # ── 7. E2E Tests (Playwright) ────────────────────────────────
   e2e:

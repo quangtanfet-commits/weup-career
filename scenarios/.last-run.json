@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-05-29T10:30:00Z",
+  "scope": "slice-1 (auth + guardian consent)",
+  "artifact": "backend/ @ feat/phase1-auth-consent (uvicorn native, sqlite)",
+  "tainted": false,
+  "holdout_integrity": "coder không truy cập scenarios/ trong build (chỉ thị + git xác nhận)",
+  "threshold": 95,
+  "scenarios": {
+    "registration-age-gate/S1_ge16_active": {"score": 92, "evidence": "HTTP 201, account_status=active, age_band=adult (dob 2008 → 18t; scenario ghi 16_17 là sai lệch giá trị của chính scenario, hệ thống suy đúng). UI /dashboard N/A (backend-only)."},
+    "registration-age-gate/S2_lt16_pending": {"score": 95, "evidence": "HTTP 201, account_status=pending_guardian_consent, age_band=under_16."},
+    "registration-age-gate/S3_lt16_assessment_403": {"score": null, "status": "DEFERRED slice-2", "evidence": "Route /assessments/* trả 404 — chưa build (đúng phạm vi slice 1)."},
+    "registration-age-gate/S4_dup_email_409": {"score": 100, "evidence": "HTTP 409."},
+    "registration-age-gate/S5_weak_pw": {"score": 95, "evidence": "HTTP 422, không tạo row."},
+    "registration-age-gate/S6_email_normalize": {"score": 100, "evidence": "'  Cuong.Pham@Example.COM  ' → lưu 'cuong.pham@example.com'."},
+    "auth-session/A1_login_cookie": {"score": 88, "evidence": "HTTP 200, access_token có; Set-Cookie HttpOnly + SameSite=strict + Path=/api/v1/auth. Secure VẮNG (dev mode, secure=is_production) — present ở production."},
+    "auth-session/A2_wrong_pw_generic": {"score": 100, "evidence": "HTTP 401, error.code=INVALID_CREDENTIALS (generic)."},
+    "auth-session/A3_revoked_rt_401": {"score": 100, "evidence": "Sau logout, refresh → HTTP 401."},
+    "auth-session/A4_rotation": {"score": 95, "evidence": "refresh#1 → 200 (RT mới); reuse RT cũ → 401; audit auth.token.reuse_detected=1 (thu hồi family)."},
+    "auth-session/A5_expired_access_401": {"score": null, "status": "NOT-EXERCISED", "evidence": "Không chờ hết hạn 15' trong run này; coder unit test có phủ. Không soft-score."},
+    "auth-session/A6_logout_revokes": {"score": 100, "evidence": "logout 204; refresh sau logout 401."},
+    "guardian-consent/G1_consent_unlocks": {"score": 90, "evidence": "invite 201 + consent 201 → child /me account_status=active. Clause 'submit RIASEC 201' DEFERRED slice-2."},
+    "guardian-consent/G2_revoke_blocks": {"score": 88, "evidence": "revoke 204 → child account_status=pending (CP-2). Clause 'submit 403' DEFERRED slice-2."},
+    "guardian-consent/G3_self_consent_forbidden": {"score": 100, "evidence": "self-invite → HTTP 403, code=SELF_CONSENT_FORBIDDEN."},
+    "guardian-consent/G4_consent_audited": {"score": 100, "evidence": "audit_log: guardian.invited=1, consent.granted=2, consent.revoked=1."},
+    "guardian-consent/G5_regrant": {"score": 100, "evidence": "re-consent 201 → account_status=active."},
+    "guardian-consent/G6_pending_views_public": {"score": null, "status": "DEFERRED slice-2", "evidence": "Route /careers chưa build."}
+  },
+  "deferred_feature_files_slice2": ["assessment","competency-progress","career-library","recommendation","counseling-rbac","wellbeing","account-data-rights"],
+  "aggregate_slice1_exercisable": 96.2,
+  "scenarios_below_60": 0,
+  "verdict": "ship (slice-1 scope only)",
+  "note": "Holdout run PHẠM VI SLICE 1. Toàn bộ suite (62 scenario/10 file) chưa satisfiable — 7 file phụ thuộc slice-2+. KHÔNG phải tín hiệu ship toàn sản phẩm."
+}

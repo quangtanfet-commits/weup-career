@@ -29,6 +29,8 @@ from app.core.security import (
     hash_refresh_token,
     verify_password,
 )
+from app.core.trace import emit as trace_emit
+from app.core.trace import token_label
 
 
 @dataclass(frozen=True)
@@ -124,6 +126,11 @@ class AuthService:
         await self._audit.record(
             action="auth.login.succeeded", actor_id=user.id, target_type="User"
         )
+        # Gate B trace: spec action Issue (new active token for the user).
+        trace_emit(
+            "Issue", user=user.id,
+            state={"token": token_label(hash_refresh_token(tokens.refresh_token))},
+        )
         return tokens
 
     # -- refresh rotation (CP-7) -----------------------------------------
@@ -168,6 +175,14 @@ class AuthService:
         await self._audit.record(
             action="auth.token.refreshed", actor_id=user.id, target_type="RefreshToken"
         )
+        # Gate B trace: spec action Rotate (old revoked + new active, atomic — CP-7).
+        trace_emit(
+            "Rotate", user=user.id,
+            state={
+                "old": token_label(stored.token_hash),
+                "new": token_label(hash_refresh_token(tokens.refresh_token)),
+            },
+        )
         return tokens
 
     # -- logout -----------------------------------------------------------
@@ -180,6 +195,11 @@ class AuthService:
             await self._tokens.revoke(stored, when=datetime.now(UTC))
             await self._audit.record(
                 action="auth.logout", actor_id=stored.user_id, target_type="RefreshToken"
+            )
+            # Gate B trace: spec action Logout (active token → revoked).
+            trace_emit(
+                "Logout", user=stored.user_id,
+                state={"token": token_label(stored.token_hash)},
             )
 
     # -- helpers ----------------------------------------------------------

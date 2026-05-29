@@ -38,10 +38,22 @@ Slice 2 (assessments) emit thêm event `ProcessCareerData` ở submit → `Conse
 - ✅ Chứng minh **máy trạng thái consent của impl khớp ConsentLifecycle** (transition none↔active↔revoked + ProcessCareerData đúng tiền điều kiện CP-1/CP-2). Impl không thực hiện transition nào spec cấm.
 - ✅ **CP-1 phần artifact giờ NON-vacuous** (slice 2) — xem mục mở rộng trên.
 - ⚠️ Abstraction map (UUID→c1) là thủ công cho 1 trẻ; mở rộng đa-trẻ ở slice sau.
-- ⏳ **AuthTokenLifecycle (CP-7)** conformance: cùng pattern, làm ở vòng tiếp (login=Issue/refresh=Rotate/logout=Logout). Chưa chạy lần này.
+- ✅ **AuthTokenLifecycle (CP-7)** conformance: đã chạy — xem mục dưới.
+
+## Mở rộng — CP-7 token lifecycle conformance (✅)
+
+Instrument `AuthService`: login→`Issue`, refresh→`Rotate`, logout→`Logout` (env-gated; `token_label()` map hash→t1/t2/… process-lifetime). Spec: `AuthTokenTrace.tla` + `AuthTokenTraceBase.tla`.
+
+| Run | Trace | Kết quả TLC | Diễn giải |
+|---|---|---|---|
+| **Conformance** | `[Issue t1, Rotate t1→t2, Rotate t2→t3, Logout t3]` (thật) | Deadlock @ State 5, **l=5 (=Len+1)** | ✅ Tiêu thụ hết; `AtMostOneActiveToken` giữ ở MỌI state — rotation **nguyên tử**, không bao giờ 2 token active cùng lúc (CP-7) |
+| **Sabotage** | `[Issue t1, Issue t2]` (2 active, không rotate) | Deadlock @ State 2, **l=2 (≠Len+1)** | ✅ Issue thứ 2 không enabled (đã có active) → drift bị bắt |
+
+> ⚠️ **Ranh giới trừu tượng (trung thực):** spec mô hình **MỘT phiên** (`AtMostOneActiveToken` = ≤1 active/user). Impl thực tế **cho ĐA phiên** (login nhiều thiết bị = nhiều refresh token active — đúng thiết kế). Conformance này chứng minh **tính nguyên tử của rotation + revoke trong MỘT phiên** (bản chất an toàn CP-7). Đa-phiên ngoài phạm vi model hiện tại (nâng spec → per-session active set nếu cần). Chống tái dùng token thu hồi đã được holdout A4 phủ (reuse RT cũ → 401).
 
 ## Artifact
-- Harness: `backend/app/core/trace.py` + hook ở `backend/app/guardians/service.py` (env-gated).
+- Harness: `backend/app/core/trace.py` (emit + token_label) + hook ở `backend/app/guardians/service.py`, `backend/app/assessments/service.py`, `backend/app/auth/service.py` (env-gated).
+- Token spec: `tla/trace/AuthTokenTrace.tla`, `AuthTokenTraceBase.tla`, `AuthTokenTrace.cfg`, `token_trace.ndjson`.
 - Spec: `tla/trace/ConsentTrace.tla`, `ConsentTraceBase.tla`, `ConsentTrace.cfg`.
 - Trace: `tla/trace/consent_trace.ndjson`.
 

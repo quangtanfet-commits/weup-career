@@ -1,0 +1,4 @@
+{"event":"Issue","user":"u1","state":{"token":"t1"}}
+{"event":"Rotate","user":"u1","state":{"old":"t1","new":"t2"}}
+{"event":"Rotate","user":"u1","state":{"old":"t2","new":"t3"}}
+{"event":"Logout","user":"u1","state":{"token":"t3"}}

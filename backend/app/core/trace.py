@@ -17,6 +17,10 @@ from typing import Any
 
 _ENV = "WEUP_TRACE_FILE"
 
+# Abstraction map: concrete refresh-token hash -> symbolic spec id (t1, t2, ...).
+# Populated only while tracing is enabled (no growth in normal runs).
+_token_labels: dict[str, str] = {}
+
 
 def emit(event: str, *, user: str, state: dict[str, Any]) -> None:
     """Append one NDJSON trace line if tracing is enabled; else no-op."""
@@ -26,3 +30,19 @@ def emit(event: str, *, user: str, state: dict[str, Any]) -> None:
     line = json.dumps({"event": event, "user": user, "state": state}, separators=(",", ":"))
     with open(path, "a", encoding="utf-8") as handle:
         handle.write(line + "\n")
+
+
+def token_label(token_hash: str) -> str:
+    """Stable symbolic id for a refresh-token hash (Gate B AuthTokenLifecycle).
+
+    No-op (returns "") unless tracing is enabled, so production never accrues
+    the map. Within a traced uvicorn process the map persists across requests,
+    giving a consistent t1/t2/... abstraction for the spec replay.
+    """
+    if not os.environ.get(_ENV):
+        return ""
+    label = _token_labels.get(token_hash)
+    if label is None:
+        label = f"t{len(_token_labels) + 1}"
+        _token_labels[token_hash] = label
+    return label

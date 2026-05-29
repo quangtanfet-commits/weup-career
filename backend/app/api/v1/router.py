@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Response, status
 from app.api.deps import get_db
 from app.assessments.router import router as assessment_router
 from app.auth.router import router as auth_router
+from app.careers.router import router as career_router
 from app.competency.router import router as competency_router
 from app.core.database import Database
 from app.guardians.router import router as guardian_router
@@ -19,6 +20,7 @@ api_router.include_router(auth_router)
 api_router.include_router(guardian_router)
 api_router.include_router(assessment_router)
 api_router.include_router(competency_router)
+api_router.include_router(career_router)
 
 
 @api_router.get("/health", tags=["ops"])

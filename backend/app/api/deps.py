@@ -16,6 +16,8 @@ from app.assessments.repository import SqlAssessmentRepo
 from app.assessments.service import AssessmentService
 from app.auth.repository import SqlRefreshTokenRepo, SqlUserRepo
 from app.auth.service import AuthService
+from app.careers.repository import SqlCareerRepo
+from app.careers.service import CareerService
 from app.competency.repository import SqlCompetencyRepo
 from app.competency.service import CompetencyService
 from app.core.audit import SqlAuditRepo
@@ -88,6 +90,10 @@ def competency_repo(session: AsyncSession = Depends(get_session)) -> SqlCompeten
     return SqlCompetencyRepo(session)
 
 
+def career_repo(session: AsyncSession = Depends(get_session)) -> SqlCareerRepo:
+    return SqlCareerRepo(session)
+
+
 def field_crypto(settings: Settings = Depends(settings_dep)) -> FieldCrypto:
     return FieldCrypto(settings.field_encryption_key)
 
@@ -134,6 +140,12 @@ def competency_service(
     audit: SqlAuditRepo = Depends(audit_repo),
 ) -> CompetencyService:
     return CompetencyService(competencies=competencies, users=users, audit=audit)
+
+
+def career_service(
+    careers: SqlCareerRepo = Depends(career_repo),
+) -> CareerService:
+    return CareerService(careers=careers)
 
 
 # -- auth dependencies ----------------------------------------------------

@@ -112,6 +112,17 @@ async def seeded_competencies(db: Database) -> dict[str, str]:
 
 
 @pytest_asyncio.fixture
+async def seeded_careers(db: Database) -> dict[str, int]:
+    """Seed pathways + careers (+ links) + content; return the seed counts."""
+    from app.careers.seed import seed_careers as _seed
+
+    async with db.session_factory() as s:
+        counts = await _seed(s)
+        await s.commit()
+    return counts
+
+
+@pytest_asyncio.fixture
 async def client(settings: Settings, db: Database) -> AsyncGenerator[AsyncClient, None]:
     app = create_app(settings)
     app.state.db = db

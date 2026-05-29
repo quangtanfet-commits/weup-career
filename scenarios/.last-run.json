@@ -1,6 +1,30 @@
 {
   "runs": [
     {
+      "scope": "slice-4 (career-library.feature)",
+      "timestamp": "2026-05-29T15:10:00Z",
+      "artifact": "backend/ @ feat/phase4-careers (8250420) — in-process ASGI (real app/DB/auth/seeders)",
+      "tainted": false,
+      "holdout_integrity": "coder không truy cập scenarios/ (chỉ thị + git xác nhận)",
+      "exec_note": "Adult>=16 (consent active mặc định); careers public nên Bearer-only đủ. Seed thật: seed_instruments+seed_competencies+seed_careers.",
+      "checks": {
+        "S1_career_detail_dieu5a": {"score": 90, "evidence": "GET /careers/{id} 'Kỹ sư phần mềm': required_competencies+training_paths+labor_market_outlook đủ; dieu5='a'; source_ref='ILO VN — Sách tra cứu nghề'; pathways=[academic,gdnn]. Trừ: không field 'mô tả' prose riêng; cơ-hội+xu-hướng gộp 1 field labor_market_outlook (substance đủ, granularity ít hơn enum scenario)."},
+        "S2_filter_riasec_I": {"score": 100, "evidence": "?riasec=I → đúng 2 nghề (Kỹ sư PM[I,R], Điều dưỡng[S,I]); all_have_I=true; cơ-khí[R,C]&thiết-kế[A,E] bị loại (excluded_present=false)."},
+        "S3_gdnn_truong_trung_hoc_nghe": {"score": 100, "evidence": "?pathway_type=vocational_secondary → 'Kỹ thuật viên cơ khí'; ?pathway_type=gdnn → 4 nghề; ?training_level=vocational lọc đúng. Luật GDNN 124/2025 branch queryable."},
+        "S4_compare_tool_5c": {"score": 65, "evidence": "2 nghề fetch đủ tiêu chí (riasec/required_competencies/training_paths/outlook) + content 5c 'So sánh ngành/nghề theo tiêu chí cá nhân' (NL12) tồn tại. NHƯNG bảng đối chiếu (Then) = UI/frontend, chưa build slice này → G-3 (frontend-deferred, không phải lỗi backend)."},
+        "S5_decision_to_NL10": {"score": 65, "evidence": "Content 5c NL10 'Quy trình ra quyết định nghề nghiệp' (dieu5=c, comp=NL10) tồn tại; NL10 progress ghi được qua /me/progress/indicators (slice 3). NHƯNG auto-link 'hoàn thành bài → learner_progress' (FR-22) chưa nối → G-4."},
+        "S6_versioned_content": {"score": 70, "evidence": "Draft 'Trải nghiệm nghề nâng cao (bản nháp)' ẩn khỏi /content?dieu5_code=d mặc định (draft_visible_in_default=false); lấy được qua ?status=draft; field version=1 có. NHƯNG luồng biên tập publish v2 + truy vết v1 chưa có endpoint → G-5."}
+      },
+      "aggregate": 81.7,
+      "scenarios_below_60": 0,
+      "verdict": "ship (slice-4 backend scope) — 3 scenario <95 đều ngoài phạm vi slice backend (UI so sánh / FR-22 auto-link / editor versioning), không scenario nào là defect slice-4; floor no-<60 đạt",
+      "gaps": {
+        "G-3": "OPEN (frontend): công cụ so sánh ngành (bảng đối chiếu UI, Điều 5c) — data + content 5c đã sẵn ở backend.",
+        "G-4": "OPEN (FR-22): auto-link hoàn thành content 5c → learner_progress NL10 (hiện ghi thủ công qua /me/progress/indicators).",
+        "G-5": "OPEN (editorial): endpoint biên tập xuất bản phiên bản mới + truy vết lịch sử version (field version đã có; status draft/published gating đã chạy)."
+      }
+    },
+    {
       "scope": "slice-3 (competency-progress.feature)",
       "timestamp": "2026-05-29T13:30:00Z",
       "artifact": "backend/ @ feat/phase3-competency — in-process ASGI (real app/DB/guard)",

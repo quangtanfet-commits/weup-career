@@ -11,5 +11,8 @@ python -m app.assessments.seed
 echo "[entrypoint] seeding competency tree (idempotent)"
 python -m app.competency.seed
 
+echo "[entrypoint] seeding career library (idempotent)"
+python -m app.careers.seed
+
 echo "[entrypoint] starting: $*"
 exec "$@"

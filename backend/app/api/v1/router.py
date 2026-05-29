@@ -1,0 +1,34 @@
+"""API v1 router aggregator + liveness/readiness probes (ADR-009)."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import APIRouter, Depends, Response, status
+
+from app.api.deps import get_db
+from app.auth.router import router as auth_router
+from app.core.database import Database
+from app.guardians.router import router as guardian_router
+
+api_router = APIRouter(prefix="/api/v1")
+
+api_router.include_router(auth_router)
+api_router.include_router(guardian_router)
+
+
+@api_router.get("/health", tags=["ops"])
+async def health() -> dict[str, str]:
+    """Liveness — always 200 while the process is running."""
+    return {"status": "ok"}
+
+
+@api_router.get("/ready", tags=["ops"])
+async def ready(response: Response, db: Database = Depends(get_db)) -> dict[str, Any]:
+    """Readiness — 200 if the DB answers, else 503."""
+    try:
+        await db.ping()
+    except Exception:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "unavailable", "database": "down"}
+    return {"status": "ready", "database": "up"}

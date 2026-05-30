@@ -112,6 +112,7 @@ async def list_school_students(
     "/counseling/sessions",
     response_model=CounselingSessionOut,
     status_code=status.HTTP_201_CREATED,
+    tags=["counseling"],
 )
 async def create_counseling_session(
     payload: CreateSessionRequest,

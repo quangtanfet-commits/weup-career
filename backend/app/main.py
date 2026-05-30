@@ -9,7 +9,9 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.router import api_router
@@ -18,6 +20,30 @@ from app.core.database import Database
 from app.core.exceptions import AppError, ValidationError
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import correlation_id_middleware
+from app.core.schemas import ErrorEnvelope
+
+# Common error responses advertised on (almost) every operation so the generated
+# OpenAPI 3.1 schema documents the structured error envelope. Mapped per HTTP
+# status to the reusable ``ErrorEnvelope`` component (BE-2 — drift gate).
+_ERROR_ENVELOPE_REF = {"$ref": "#/components/schemas/ErrorEnvelope"}
+_COMMON_ERROR_STATUSES: dict[str, str] = {
+    "401": "Authentication required or token invalid",
+    "403": "Permission denied / consent required",
+    "404": "Resource not found",
+    "409": "Conflict",
+    "422": "Validation error",
+}
+
+
+def _unique_operation_id(route: APIRoute) -> str:
+    """Stable ``operationId`` = the route handler's function name.
+
+    Handler names are unique across all routers (verified in CI by the OpenAPI
+    test), so this yields clean, stable ids (e.g. ``list_careers``) that do not
+    churn when a path or tag changes — keeping the frontend's generated
+    ``types/api.d.ts`` diff minimal (BE-2).
+    """
+    return route.name
 
 
 def _error_body(
@@ -56,6 +82,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/api/v1/openapi.json",
         docs_url="/api/v1/docs",
         redoc_url="/api/v1/redoc",
+        generate_unique_id_function=_unique_operation_id,
     )
 
     app.state.settings = settings
@@ -103,6 +130,59 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     app.include_router(api_router)
+
+    def custom_openapi() -> dict[str, Any]:
+        """Build the OpenAPI 3.1 schema once and harden it (BE-2).
+
+        - Registers the reusable ``ErrorEnvelope`` component.
+        - Advertises the structured error envelope on the common 4xx responses
+          (401/403/404/409/422) for every operation that does not already
+          declare them, so the generated TypeScript client types the error
+          contract instead of falling back to ``unknown``.
+
+        Cached on ``app.openapi_schema`` (FastAPI's standard memoization) so the
+        cost is paid once per process.
+        """
+        if app.openapi_schema:
+            return app.openapi_schema
+
+        schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            openapi_version=app.openapi_version,
+            description=app.description,
+            routes=app.routes,
+        )
+
+        components = schema.setdefault("components", {})
+        schemas = components.setdefault("schemas", {})
+        # Pydantic v2 returns the top-level model schema with nested models under
+        # ``$defs``; flatten so ErrorEnvelope + ErrorDetail are first-class
+        # components referenceable as #/components/schemas/<name>.
+        envelope = ErrorEnvelope.model_json_schema(ref_template="#/components/schemas/{model}")
+        for name, definition in envelope.pop("$defs", {}).items():
+            schemas.setdefault(name, definition)
+        schemas.setdefault("ErrorEnvelope", envelope)
+
+        for path_item in schema.get("paths", {}).values():
+            for method, operation in path_item.items():
+                if method.lower() not in {"get", "post", "put", "patch", "delete"}:
+                    continue
+                responses = operation.setdefault("responses", {})
+                for code, description in _COMMON_ERROR_STATUSES.items():
+                    # Overwrite (not setdefault): FastAPI auto-injects a 422 typed
+                    # as ``HTTPValidationError``, but our exception handlers return
+                    # the structured ErrorEnvelope for *every* 4xx (incl. 422), so
+                    # the schema must advertise the envelope to match runtime.
+                    responses[code] = {
+                        "description": description,
+                        "content": {"application/json": {"schema": _ERROR_ENVELOPE_REF}},
+                    }
+
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = custom_openapi  # type: ignore[method-assign]
     return app
 
 

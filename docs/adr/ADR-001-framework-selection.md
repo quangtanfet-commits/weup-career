@@ -100,6 +100,31 @@ Use **React 18** with **TypeScript 5** and **Vite 5** as the build tool.
 
 ---
 
+## Note (BE-1, 2026-05-29): Điều-5(a) public reads are anonymous-readable
+
+The career library + 5c/5d learning content (Điều 5(a)) are **public information**
+and the frontend serves them as public SEO pages, so their read endpoints must be
+reachable **without a login**. As of BE-1, these GET routes depend on a new
+`optional_current_user` dependency (`app/api/deps.py`) instead of `get_current_user`:
+
+- `GET /api/v1/careers`, `GET /api/v1/careers/{id}`, `GET /api/v1/content`,
+  `GET /api/v1/content/{id_in_list}` — **anonymous allowed** (no `Authorization`
+  header → `None`; a **present-but-invalid** token still → 401, never silently
+  downgraded to anonymous).
+- **Published-only invariant:** every caller — anonymous or authenticated — only
+  sees `published` content. An anonymous caller **cannot** override `?status=` to
+  surface `draft`/`archived`; `status` is forced to `published` when the request is
+  unauthenticated. Authenticated callers retain the existing `?status=` ability.
+- Editor write/inspection routes (`POST /content`, `POST /content/{id}/versions`,
+  `GET /content/{id}`) remain `require_content_editor` (Bearer + DB-derived
+  authority). All personal/sensitive/relational/consent-gated routes are unchanged.
+
+This is consistent with the CSR/SEO consequence noted above and with the actor
+model: "Anonymous" may read the công-khai Điều-5(a) library, but still cannot
+touch sensitive career data (assessments/progress/recommendations).
+
+---
+
 ## Supporting Libraries
 
 ### Backend

@@ -334,6 +334,7 @@ jobs:
       - name: Build & start Docker stack for E2E
         env:
           SECRET_KEY: ci-e2e-test-secret-not-for-production
+          FIELD_ENCRYPTION_KEY: ci-e2e-test-field-encryption-key-not-for-production
           ENVIRONMENT: test
         run: |
           docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build
@@ -345,6 +346,12 @@ jobs:
         env:
           BASE_URL: http://localhost
         run: npx playwright test --project=${{ matrix.browser }} --reporter=html
+
+      - name: Dump Docker stack logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.test.yml ps
+          docker compose -f docker-compose.yml -f docker-compose.test.yml logs --no-color --timestamps
 
       - name: Upload test artifacts on failure
         if: failure()
@@ -358,7 +365,7 @@ jobs:
 
       - name: Stop Docker stack
         if: always()
-        run: docker compose down
+        run: docker compose -f docker-compose.yml -f docker-compose.test.yml down -v
 
   # ── 8. Container Image Build & Scan ─────────────────────────
   build-and-scan:

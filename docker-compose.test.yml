@@ -20,9 +20,13 @@ services:
       - path: ./backend/.env
         required: false
     environment:
-      # A non-production throwaway secret; CI also exports SECRET_KEY but this
-      # guarantees the backend boots from `docker compose` alone.
+      # Non-production throwaway secrets; CI also exports SECRET_KEY but these
+      # guarantee the backend boots from `docker compose` alone. Both keys are
+      # required by Settings (Field(min_length=32)) — omitting FIELD_ENCRYPTION_KEY
+      # makes pydantic raise at boot, crashing the container before its
+      # healthcheck start_period elapses.
       SECRET_KEY: ${SECRET_KEY:-e2e-test-secret-not-for-production-use-only}
+      FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:-e2e-test-field-encryption-key-not-for-production}
       DATABASE_URL: sqlite+aiosqlite:////data/app.db
       ENVIRONMENT: ${ENVIRONMENT:-test}
       LOG_LEVEL: warning

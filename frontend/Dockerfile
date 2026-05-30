@@ -32,6 +32,14 @@ ENV HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
+# Drop the base image's bundled npm/npx/corepack CLI. The standalone server
+# runs with `node server.js` and never invokes npm at runtime, so npm's
+# vendored deps (cross-spawn, glob, minimatch, tar) only widen the attack
+# surface — Trivy flags their fixable CVEs against this image even though the
+# app's own node_modules are clean. Removing them eliminates that whole class.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+  /usr/local/lib/node_modules/corepack /usr/local/bin/corepack
+
 # Copy only the standalone server output + static assets + public files.
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

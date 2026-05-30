@@ -38,7 +38,9 @@ async function registerAdult(page: import("@playwright/test").Page) {
   await page.getByLabel("Cấp học").selectOption({ value: "none" });
   // "Mật khẩu" is a prefix of the confirm label, so match it exactly.
   await page.getByLabel("Mật khẩu", { exact: true }).fill("WeUpPass123");
-  await page.getByLabel("Mật khẩu nhập lại").fill("WeUpPass123");
+  await page
+    .getByLabel("Xác nhận mật khẩu", { exact: true })
+    .fill("WeUpPass123");
 
   await page.getByRole("button", { name: "Đăng ký", exact: true }).click();
 
@@ -54,7 +56,7 @@ test.describe("wellbeing — support request (authenticated adult)", () => {
     await page.goto("/wellbeing");
 
     await expect(
-      page.getByRole("heading", { level: 1, name: "Sức khỏe tinh thần" }),
+      page.getByRole("heading", { level: 3, name: "Sức khỏe tinh thần" }),
     ).toBeVisible();
 
     // The safe path to a human counselor is always visible (FR-71).

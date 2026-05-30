@@ -22,8 +22,13 @@ export default async function PublicLayout({
           </Link>
           <ul className="flex items-center gap-6 text-sm">
             <li>
-              <Link href="/nghe-nghiep" className="hover:text-primary-700">
+              <Link href="/careers" className="hover:text-primary-700">
                 {t("careers")}
+              </Link>
+            </li>
+            <li>
+              <Link href="/content" className="hover:text-primary-700">
+                {t("content")}
               </Link>
             </li>
             <li>

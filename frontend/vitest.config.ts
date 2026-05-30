@@ -35,6 +35,8 @@ export default defineConfig({
         "features/**/*.{ts,tsx}",
         "lib/**/*.{ts,tsx}",
         "app/(public)/nghe-nghiep/**/*.{ts,tsx}",
+        "app/(public)/careers/**/*.{ts,tsx}",
+        "app/(public)/content/**/*.{ts,tsx}",
       ],
       exclude: [
         "lib/api/schema.ts",

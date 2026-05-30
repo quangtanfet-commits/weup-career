@@ -13,8 +13,27 @@ env:
   IMAGE_PREFIX: ${{ github.repository }}
 
 jobs:
+  check-secrets:
+    name: "🔐 Check staging secrets"
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.guard.outputs.configured }}
+    steps:
+      - id: guard
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+        run: |
+          if [ -n "$STAGING_HOST" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Staging secrets not configured — skipping deploy"
+          fi
+
   deploy-staging:
     name: "🚀 Deploy to Staging"
+    needs: check-secrets
+    if: needs.check-secrets.outputs.configured == 'true'
     runs-on: ubuntu-latest
     environment:
       name: staging

@@ -14,11 +14,7 @@ import { isConsentGated } from "@/lib/auth/consent";
  * the feature, so the user is never led into a backend 403 dead end. When not
  * gated it renders its children unchanged. Public content is never wrapped.
  */
-export function ConsentGateBanner({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function ConsentGateBanner({ children }: { children: React.ReactNode }) {
   const t = useTranslations("consent");
   const user = useAuthStore((s) => s.user);
 

@@ -23,7 +23,11 @@ import {
  * side, `POST /auth/login` sets the httpOnly refresh cookie and returns the
  * access token + user, which is stored **in memory only** (no localStorage).
  */
-export function LoginForm({ redirectTo = "/dashboard" }: { redirectTo?: string }) {
+export function LoginForm({
+  redirectTo = "/dashboard",
+}: {
+  redirectTo?: string;
+}) {
   const t = useTranslations("auth");
   const router = useRouter();
   const setSessionFromToken = useAuthStore((s) => s.setSessionFromToken);
@@ -45,9 +49,7 @@ export function LoginForm({ redirectTo = "/dashboard" }: { redirectTo?: string }
       setSessionFromToken(res.access_token, res.user);
       router.replace(redirectTo);
     } catch (err) {
-      setSubmitError(
-        err instanceof ApiError ? err.message : t("genericError"),
-      );
+      setSubmitError(err instanceof ApiError ? err.message : t("genericError"));
     }
   });
 
@@ -59,7 +61,11 @@ export function LoginForm({ redirectTo = "/dashboard" }: { redirectTo?: string }
         </p>
       ) : null}
 
-      <FormField id="login-email" label={t("email")} error={errors.email?.message}>
+      <FormField
+        id="login-email"
+        label={t("email")}
+        error={errors.email?.message}
+      >
         <Input type="email" autoComplete="email" {...register("email")} />
       </FormField>
 

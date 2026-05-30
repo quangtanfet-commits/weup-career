@@ -70,7 +70,10 @@ describe("LoginForm", () => {
     );
 
     await waitFor(() => expect(login).toHaveBeenCalledTimes(1));
-    expect(login).toHaveBeenCalledWith({ email: "a@b.vn", password: "abcdef12" });
+    expect(login).toHaveBeenCalledWith({
+      email: "a@b.vn",
+      password: "abcdef12",
+    });
     await waitFor(() => expect(getAccessToken()).toBe("logged-in-token"));
     expect(replace).toHaveBeenCalledWith("/dashboard");
   });
@@ -94,7 +97,11 @@ describe("LoginForm", () => {
 
   it("surfaces the backend error message on a failed login", async () => {
     login.mockRejectedValue(
-      new ApiError(401, "Email hoặc mật khẩu không đúng", "INVALID_CREDENTIALS"),
+      new ApiError(
+        401,
+        "Email hoặc mật khẩu không đúng",
+        "INVALID_CREDENTIALS",
+      ),
     );
     const user = userEvent.setup();
     renderWithIntl(<LoginForm />);

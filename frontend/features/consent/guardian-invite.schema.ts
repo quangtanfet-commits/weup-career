@@ -8,11 +8,7 @@ import type { components } from "@/lib/api/schema";
  * verifies and grants consent. Mirrors the backend `InviteRequest` shape so the
  * request body is contract-checked (NFR-20).
  */
-export const relationships = [
-  "mother",
-  "father",
-  "guardian",
-] as const;
+export const relationships = ["mother", "father", "guardian"] as const;
 
 export type Relationship = (typeof relationships)[number];
 

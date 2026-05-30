@@ -4,10 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuthStore } from "@/lib/auth/store";
-import {
-  onAuthLost,
-  restoreSession,
-} from "@/lib/auth/session-restore";
+import { onAuthLost, restoreSession } from "@/lib/auth/session-restore";
 
 /**
  * Startup session restore (architecture.md §5.1). The in-memory access token is

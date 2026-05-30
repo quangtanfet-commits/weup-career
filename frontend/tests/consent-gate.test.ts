@@ -38,7 +38,10 @@ describe("isConsentGated", () => {
   it("does NOT gate users aged 16+ regardless of status", () => {
     expect(
       isConsentGated(
-        makeUser({ age_band: "16_17", account_status: "pending_guardian_consent" }),
+        makeUser({
+          age_band: "16_17",
+          account_status: "pending_guardian_consent",
+        }),
       ),
     ).toBe(false);
     expect(

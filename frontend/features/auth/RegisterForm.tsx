@@ -73,7 +73,10 @@ export function RegisterForm() {
     try {
       await registerAccount(toRegisterPayload(values));
       // Register returns no token; log in to obtain the session.
-      const res = await login({ email: values.email, password: values.password });
+      const res = await login({
+        email: values.email,
+        password: values.password,
+      });
       setSessionFromToken(res.access_token, res.user);
       const next =
         res.user.account_status === "pending_guardian_consent"
@@ -81,9 +84,7 @@ export function RegisterForm() {
           : "/dashboard";
       router.replace(next);
     } catch (err) {
-      setSubmitError(
-        err instanceof ApiError ? err.message : t("genericError"),
-      );
+      setSubmitError(err instanceof ApiError ? err.message : t("genericError"));
     }
   });
 

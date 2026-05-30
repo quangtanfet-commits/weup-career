@@ -23,7 +23,10 @@ describe("FormField", () => {
     );
     const input = screen.getByLabelText("Mật khẩu");
     expect(input).toHaveAttribute("aria-describedby", "pw-hint");
-    expect(screen.getByText("Tối thiểu 8 ký tự")).toHaveAttribute("id", "pw-hint");
+    expect(screen.getByText("Tối thiểu 8 ký tự")).toHaveAttribute(
+      "id",
+      "pw-hint",
+    );
   });
 
   it("flags the control invalid and exposes the error via role=alert", () => {

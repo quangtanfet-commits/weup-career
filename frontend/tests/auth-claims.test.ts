@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import {
-  decodeAccessTokenClaims,
-  rolesFromToken,
-} from "@/lib/auth/claims";
+import { decodeAccessTokenClaims, rolesFromToken } from "@/lib/auth/claims";
 import { encodeTestToken } from "./helpers/jwt";
 
 describe("decodeAccessTokenClaims", () => {

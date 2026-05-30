@@ -90,9 +90,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   clearSession: () =>
     set({ accessToken: null, user: null, status: "anonymous" }),
   finishLoading: () =>
-    set((s) =>
-      s.status === "loading" ? { ...s, status: "anonymous" } : s,
-    ),
+    set((s) => (s.status === "loading" ? { ...s, status: "anonymous" } : s)),
 }));
 
 /**

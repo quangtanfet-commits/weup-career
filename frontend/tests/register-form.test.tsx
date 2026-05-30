@@ -36,13 +36,13 @@ function tokenResponse(accountStatus: string, ageBand: string) {
   };
 }
 
-async function fillBaseFields(user: ReturnType<typeof userEvent.setup>, dob: string) {
+async function fillBaseFields(
+  user: ReturnType<typeof userEvent.setup>,
+  dob: string,
+) {
   await user.type(screen.getByLabelText(viMessages.auth.email), "child@b.vn");
   await user.type(screen.getByLabelText(viMessages.auth.dateOfBirth), dob);
-  await user.type(
-    screen.getByLabelText(viMessages.auth.password),
-    "Abcdef12",
-  );
+  await user.type(screen.getByLabelText(viMessages.auth.password), "Abcdef12");
   await user.type(
     screen.getByLabelText(viMessages.auth.confirmPassword),
     "Abcdef12",
@@ -120,7 +120,9 @@ describe("RegisterForm", () => {
       screen.getByRole("button", { name: viMessages.auth.registerSubmit }),
     );
 
-    expect(await screen.findByText("Email đã được sử dụng")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Email đã được sử dụng"),
+    ).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });
 

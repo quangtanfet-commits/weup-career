@@ -32,7 +32,11 @@ describe("useSessionBootstrap", () => {
     restoreSession.mockReset();
     authLostHandler = null;
     act(() =>
-      useAuthStore.setState({ status: "loading", accessToken: null, user: null }),
+      useAuthStore.setState({
+        status: "loading",
+        accessToken: null,
+        user: null,
+      }),
     );
   });
   afterEach(() => {

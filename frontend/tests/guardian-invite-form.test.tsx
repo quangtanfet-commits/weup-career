@@ -52,7 +52,9 @@ describe("GuardianInviteForm", () => {
       guardian_email: "me@example.vn",
       relationship: "mother",
     });
-    expect(await screen.findByText(viMessages.consent.inviteSent)).toBeInTheDocument();
+    expect(
+      await screen.findByText(viMessages.consent.inviteSent),
+    ).toBeInTheDocument();
     expect(onInvited).toHaveBeenCalledTimes(1);
     // After a successful send the button switches to "resend".
     expect(

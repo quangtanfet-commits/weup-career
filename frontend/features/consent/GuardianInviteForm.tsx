@@ -30,11 +30,7 @@ const RELATIONSHIP_LABELS: Record<(typeof relationships)[number], string> = {
  * `onInvited` lets the parent page refresh the consent status after a successful
  * invite/resend.
  */
-export function GuardianInviteForm({
-  onInvited,
-}: {
-  onInvited?: () => void;
-}) {
+export function GuardianInviteForm({ onInvited }: { onInvited?: () => void }) {
   const t = useTranslations("consent");
   const [status, setStatus] = useState<"idle" | "sent">("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -57,9 +53,7 @@ export function GuardianInviteForm({
       reset();
       onInvited?.();
     } catch (err) {
-      setSubmitError(
-        err instanceof ApiError ? err.message : t("genericError"),
-      );
+      setSubmitError(err instanceof ApiError ? err.message : t("genericError"));
     }
   });
 

@@ -83,9 +83,8 @@ export async function apiFetch<T>(
   // `skipAuthRefresh` short-circuits this for `/auth/refresh` itself.
   if (response.status === 401 && !skipAuthRefresh) {
     // Lazy import breaks the client ↔ session-restore module cycle.
-    const { restoreSession, notifyAuthLost } = await import(
-      "@/lib/auth/session-restore"
-    );
+    const { restoreSession, notifyAuthLost } =
+      await import("@/lib/auth/session-restore");
     const newToken = await restoreSession();
     if (newToken === null) {
       notifyAuthLost();

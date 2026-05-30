@@ -433,26 +433,35 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:buildcache,mode=max
 
-      # Trivy scan — backend
-      - name: Trivy scan — backend
+      # Trivy: report and gate are split. The report steps (exit-code 0)
+      # ALWAYS produce SARIF so the Security tab populates even when the gate
+      # below fails. The gate steps fail the build only on ACTIONABLE
+      # (fixable) CRITICAL/HIGH vulns — ignore-unfixed drops base-OS CVEs that
+      # have no upstream patch yet (not actionable, would block on noise).
+      # Both reuse TRIVY_CACHE_DIR, so the vuln DB is downloaded once.
+
+      # Backend — SARIF report (never fails)
+      - name: Trivy report — backend
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:sha-${{ github.sha }}
           format: sarif
           output: trivy-backend.sarif
           severity: CRITICAL,HIGH
-          exit-code: "1"
+          ignore-unfixed: true
+          exit-code: "0"
         if: github.event_name != 'pull_request'
 
-      # Trivy scan — frontend
-      - name: Trivy scan — frontend
+      # Frontend — SARIF report (never fails)
+      - name: Trivy report — frontend
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:sha-${{ github.sha }}
           format: sarif
           output: trivy-frontend.sarif
           severity: CRITICAL,HIGH
-          exit-code: "1"
+          ignore-unfixed: true
+          exit-code: "0"
         if: github.event_name != 'pull_request'
 
       - name: Upload Trivy SARIF
@@ -462,6 +471,28 @@ jobs:
             trivy-backend.sarif
             trivy-frontend.sarif
         if: always() && github.event_name != 'pull_request'
+
+      # Backend — gate (fails on fixable CRITICAL/HIGH)
+      - name: Trivy gate — backend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:sha-${{ github.sha }}
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+        if: github.event_name != 'pull_request'
+
+      # Frontend — gate (fails on fixable CRITICAL/HIGH)
+      - name: Trivy gate — frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:sha-${{ github.sha }}
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+        if: github.event_name != 'pull_request'
 
   # ── 9. PR Summary ─────────────────────────────────────────────
   ci-summary:

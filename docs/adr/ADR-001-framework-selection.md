@@ -1,10 +1,12 @@
 # ADR-001: Framework Selection
 
-**Status:** Accepted (cập nhật cho domain WeUp Career)
-**Date:** 2026-05-27 (rev. 2026-05-29)
+**Status:** Accepted (Backend) · **Frontend phần SPA: SUPERSEDED bởi [ADR-014](ADR-014-frontend-framework.md)**
+**Date:** 2026-05-27 (rev. 2026-05-29; frontend superseded 2026-05-30)
 **Deciders:** Engineering Team
 
-> Quyết định stack nền tảng (FastAPI + React/TS/Vite) **giữ nguyên** cho WeUp Career. Bản cập nhật chỉ điều chỉnh ví dụ thư viện theo domain hướng nghiệp (bỏ drag-reorder của todo; thêm thư viện biểu đồ cho dashboard tiến bộ năng lực).
+> **Backend (FastAPI) giữ nguyên** cho WeUp Career.
+>
+> **Frontend đã thay đổi:** quyết định React 18 + Vite 5 (SPA, CSR-only) ở mục "Frontend" bên dưới **đã bị thay thế bởi [ADR-014](ADR-014-frontend-framework.md) → Next.js 15 (App Router) + React 19 + TS strict**. Lý do: BE-1 biến thư viện nghề Điều 5a + nội dung 5c/5d thành **anonymous-readable public SEO pages**, nên cần SSR/RSC (Next.js) thay vì SPA chỉ-client. Mục "Frontend" và "Arguments For Vite" dưới đây **giữ lại làm bối cảnh lịch sử** — đọc ADR-014 cho quyết định hiện hành. Các thư viện lớp client (Zustand, TanStack Query, RHF+Zod, Tailwind, Radix, Recharts) trong bảng "Supporting Libraries" vẫn áp dụng dưới Next.js.
 
 ---
 
@@ -64,7 +66,9 @@ Use **FastAPI** (Python 3.12) with **Uvicorn** ASGI server.
 
 ## Frontend: React + TypeScript + Vite
 
-### Decision
+> ⚠️ **SUPERSEDED bởi [ADR-014](ADR-014-frontend-framework.md) (2026-05-30).** Quyết định hiện hành là **Next.js 15 App Router + React 19 + TypeScript strict** (vẫn React/TS, thêm Server Components cho nội dung công khai Điều 5a). Nội dung mục này giữ lại làm bối cảnh lịch sử về *vì sao ban đầu chọn SPA* và *vì sao Vite over CRA*. Giả định "logged-in-only SPA, không cần SSR" không còn đúng sau BE-1 (xem ADR-014 §Context).
+
+### Decision (lịch sử — xem ADR-014)
 Use **React 18** with **TypeScript 5** and **Vite 5** as the build tool.
 
 ### Considered Alternatives

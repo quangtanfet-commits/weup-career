@@ -15,7 +15,7 @@ graph TB
             NGINX["nginx:alpine<br/>:80 → :443<br/>TLS termination<br/>Static file serving<br/>Rate limiting"]
             
             subgraph "frontend container"
-                VITE["Vite dev server<br/>:5173 (dev mode)<br/>HMR enabled<br/>React + TypeScript"]
+                VITE["Next.js dev server<br/>:3000 (next dev)<br/>HMR + RSC/Fast Refresh<br/>React 19 + TypeScript"]
             end
             
             subgraph "backend container"
@@ -223,13 +223,18 @@ Stage 2: python:3.12-slim (runtime)
 ```
 Stage 1: node:20-alpine (builder)
   - npm ci (frozen lockfile)
-  - npm run build (Vite)
-  - Output: dist/
+  - npm run build (next build)
+  - Output: .next/ (standalone)
 
-Stage 2: nginx:alpine (runtime)
-  - Copy dist/ to /usr/share/nginx/html
-  - Custom nginx.conf (SPA routing)
-  - Final image: ~45MB
+Stage 2: node:20-alpine (runtime)        # Node runtime — RSC public Điều 5a cần server-render
+  - Copy .next/standalone + .next/static + public/
+  - CMD ["node", "server.js"]  (next start, :3000)
+  - Run as non-root (uid=1000), HEALTHCHECK built-in
+  - Final image: ~140MB
+
+# Nginx reverse-proxy tới Node runtime này (KHÔNG còn static-only + index.html
+# fallback). Static assets (.next/static, /public) có thể để nginx cache/serve
+# trực tiếp; mọi route khác proxy sang Next.js để RSC/ISR hoạt động.
 ```
 
 ---

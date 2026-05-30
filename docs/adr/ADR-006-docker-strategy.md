@@ -31,13 +31,14 @@ Use **multi-stage Docker builds** for both backend and frontend, with distinct `
 
 ### Frontend: 2-stage
 
-**Stage 1 (builder):** `node:20-alpine` + `npm ci` + `npm run build`
-**Stage 2 (runtime):** `nginx:1.25-alpine` — copy only `dist/`
+> **Cập nhật (ADR-014, 2026-05-30):** frontend chuyển từ Vite SPA static sang **Next.js 15 (App Router)**. Runtime stage nay là **Node.js** (`next start`), không phải nginx static — vì các route công khai Điều 5a render server-side (RSC/ISR) để SEO. Mô tả nginx-static bên dưới là **lịch sử**; topology hiện hành xem [deployment.md §Frontend Dockerfile](../architecture/deployment.md).
+
+**Stage 1 (builder):** `node:20-alpine` + `npm ci` + `npm run build` (`next build`, standalone)
+**Stage 2 (runtime):** `node:20-alpine` — copy `.next/standalone` + `.next/static` + `public/`; `CMD node server.js`
 
 **Benefits:**
-- Final image: ~45MB
-- Node.js not present in production image
-- `nginx.conf` baked in with SPA fallback rule (`try_files $uri /index.html`)
+- Final image: ~140MB (Node runtime cần thiết cho RSC/ISR)
+- Nginx đứng trước làm reverse-proxy + TLS + cache static assets; **không** còn `try_files $uri /index.html` SPA-fallback (Next.js tự routing server-side)
 
 ---
 

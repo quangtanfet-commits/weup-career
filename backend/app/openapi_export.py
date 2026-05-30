@@ -10,9 +10,12 @@ Usage::
     python -m app.openapi_export              # → stdout
     python -m app.openapi_export openapi.json # → file
 
-Importing the app does not require production secrets (settings are resolved
-lazily via the factory), and building the schema runs no I/O, so this is safe to
-call in CI without a database.
+The schema is independent of every secret *value*, so this builds the app with
+throwaway placeholder secrets instead of reading the production ``SECRET_KEY`` /
+``FIELD_ENCRYPTION_KEY`` from the environment. That keeps the exporter hermetic:
+it runs in CI (and the frontend drift gate) with no database and no secrets,
+while the production ``Settings()`` stays strict (the required secrets have no
+insecure defaults).
 """
 
 from __future__ import annotations
@@ -22,12 +25,27 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from app.core.config import Settings
 from app.main import create_app
+
+# 32+ char throwaway values satisfying the ``min_length=32`` constraint on the
+# two required secret fields. Used ONLY for schema generation — never for any
+# cryptographic operation — so the literal value is irrelevant.
+_PLACEHOLDER_SECRET = "x" * 32
+
+
+def _schema_settings() -> Settings:
+    """Hermetic Settings for schema export — placeholder secrets, env ignored."""
+    return Settings(
+        environment="test",
+        secret_key=_PLACEHOLDER_SECRET,
+        field_encryption_key=_PLACEHOLDER_SECRET,
+    )
 
 
 def build_openapi() -> dict[str, Any]:
     """Return the application's hardened OpenAPI 3.1 schema as a dict."""
-    app = create_app()
+    app = create_app(_schema_settings())
     return app.openapi()
 
 

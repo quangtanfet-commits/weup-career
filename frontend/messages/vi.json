@@ -220,5 +220,33 @@
       "closed": "Đã hoàn tất"
     },
     "genericError": "Có lỗi xảy ra. Vui lòng thử lại sau."
+  },
+  "recommendations": {
+    "listTitle": "Gợi ý hướng nghiệp",
+    "listSubtitle": "Những gợi ý dựa trên hồ sơ và kết quả của bạn — luôn kèm lý do và do bạn quyết định.",
+    "generateTitle": "Tạo gợi ý mới",
+    "generateDescription": "Hệ thống tổng hợp hồ sơ, kết quả trắc nghiệm và tiến bộ năng lực của bạn để đưa ra một gợi ý có giải thích.",
+    "humanInLoopNotice": "Gợi ý chỉ là một lựa chọn có lý do. Hệ thống không tự thực hiện bất kỳ quyết định phân luồng nào — bạn (hoặc người giám hộ, giáo viên) mới là người quyết định.",
+    "generate": "Tạo gợi ý",
+    "generating": "Đang tạo gợi ý…",
+    "detailTitle": "Gợi ý hướng nghiệp",
+    "detailLoading": "Đang tải gợi ý…",
+    "detailLoadError": "Không tải được gợi ý. Vui lòng thử lại.",
+    "detailNotFound": "Không tìm thấy gợi ý này hoặc bạn không có quyền xem.",
+    "cardTitle": "Gợi ý dành cho bạn",
+    "cardDescription": "Một lựa chọn có lý do — hãy đọc kỹ phần giải thích trước khi quyết định.",
+    "rationaleTitle": "Vì sao có gợi ý này",
+    "rationaleMissing": "Gợi ý này thiếu phần giải thích nên không thể hiển thị. Đây là lỗi dữ liệu — vui lòng thử tạo lại gợi ý.",
+    "decisionIsYours": "Quyết định cuối cùng thuộc về bạn, người giám hộ hoặc giáo viên của bạn. Đây chỉ là một gợi ý để tham khảo.",
+    "notEffective": "Gợi ý này chưa có hiệu lực. Nó chỉ được ghi nhận sau khi bạn xác nhận tường minh bên dưới.",
+    "confirmPrompt": "Bạn muốn làm gì với gợi ý này?",
+    "confirmSubmitting": "Đang ghi nhận…",
+    "confirmedState": "Bạn đã {decision} gợi ý này.",
+    "decision": {
+      "accepted": "Chấp nhận",
+      "rejected": "Từ chối",
+      "deferred": "Để sau"
+    },
+    "genericError": "Có lỗi xảy ra. Vui lòng thử lại sau."
   }
 }

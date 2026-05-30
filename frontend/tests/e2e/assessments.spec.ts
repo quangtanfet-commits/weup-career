@@ -38,7 +38,7 @@ test.describe("assessment routes are guarded (anonymous)", () => {
       // /login; the protected assessment UI is never shown.
       await page.waitForURL(/\/login(\?.*)?$/);
       await expect(
-        page.getByRole("heading", { level: 1, name: "Đăng nhập" }),
+        page.getByRole("heading", { level: 3, name: "Đăng nhập" }),
       ).toBeVisible();
     });
   }

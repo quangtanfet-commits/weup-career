@@ -192,5 +192,33 @@
     "cancelDelete": "Hủy",
     "deleting": "Đang xóa…",
     "deleteError": "Không xóa được kết quả. Vui lòng thử lại."
+  },
+  "wellbeing": {
+    "pageTitle": "Sức khỏe tinh thần",
+    "pageDescription": "Một vài gợi ý để cân bằng việc học và cuộc sống — và cách kết nối với người hỗ trợ khi bạn cần.",
+    "introStress": "Áp lực học tập, thi cử hay các mối quan hệ đôi khi khiến ta căng thẳng. Đó là điều bình thường, và có những cách nhẹ nhàng để chăm sóc bản thân: nghỉ ngơi đủ, vận động, trò chuyện với người bạn tin tưởng.",
+    "introBalance": "Cân bằng không có nghĩa là làm thật nhiều. Hãy chia nhỏ mục tiêu, dành thời gian cho điều mình thích, và cho phép mình được nghỉ.",
+    "introSeekHelp": "Nếu bạn thấy mệt mỏi kéo dài, khó tập trung hay không còn thấy hứng thú với những điều từng yêu thích, hãy nói với một người lớn đáng tin cậy. Tìm sự hỗ trợ là một biểu hiện của sự dũng cảm, không phải yếu đuối.",
+    "counselorHeading": "Kết nối với chuyên viên tư vấn học đường",
+    "counselorDescription": "Chuyên viên tư vấn tâm lý học đường (Tier 3) là người thật, sẵn sàng lắng nghe và đồng hành cùng bạn. Bạn có thể gửi yêu cầu bên dưới để được kết nối; cuộc trò chuyện được giữ kín theo quy định.",
+    "nonClinicalNote": "Trang này không chẩn đoán hay đánh giá y tế. Đây chỉ là cầu nối để bạn gặp được người có thể hỗ trợ. Nếu bạn đang trong tình huống khẩn cấp, hãy liên hệ ngay người lớn bên cạnh hoặc đường dây hỗ trợ khẩn cấp.",
+    "requestTitle": "Gửi yêu cầu hỗ trợ",
+    "requestDescription": "Hãy chia sẻ đôi điều bạn đang trải qua. Bạn không cần kể chi tiết — chỉ cần đủ để chúng tôi kết nối bạn với một chuyên viên tư vấn.",
+    "messageLabel": "Bạn muốn chia sẻ điều gì?",
+    "messageHint": "Viết theo cách của bạn. Không có câu trả lời đúng hay sai, và bạn không bị đánh giá.",
+    "submit": "Gửi yêu cầu",
+    "submitting": "Đang gửi…",
+    "sendAnother": "Gửi yêu cầu khác",
+    "requestSent": "Đã gửi yêu cầu của bạn. Một chuyên viên tư vấn sẽ sớm liên hệ với bạn.",
+    "listTitle": "Yêu cầu của bạn",
+    "listDescription": "Các yêu cầu hỗ trợ bạn đã gửi và trạng thái kết nối.",
+    "listLoading": "Đang tải yêu cầu của bạn…",
+    "listEmpty": "Bạn chưa gửi yêu cầu hỗ trợ nào.",
+    "status": {
+      "open": "Đã tiếp nhận",
+      "acknowledged": "Chuyên viên đang hỗ trợ",
+      "closed": "Đã hoàn tất"
+    },
+    "genericError": "Có lỗi xảy ra. Vui lòng thử lại sau."
   }
 }

@@ -114,5 +114,46 @@
     "upper_secondary": "THPT",
     "tertiary": "Sau phổ thông",
     "none": "Không xác định"
+  },
+  "progress": {
+    "title": "Tiến bộ năng lực",
+    "subtitle": "Theo dõi hành trình K-A-R của bạn qua 12 năng lực hướng nghiệp.",
+    "loading": "Đang tải tiến bộ năng lực…",
+    "loadError": "Không tải được tiến bộ năng lực. Vui lòng thử lại sau.",
+    "empty": "Chưa có dữ liệu năng lực.",
+    "overviewHeading": "Tổng quan tiến bộ K-A-R",
+    "overviewDescription": "Mỗi năng lực được đo theo ba mức nhận thức: Nhận biết, Thực hiện, Vận dụng. Tiến bộ chỉ tiến lên, không lùi.",
+    "treeHeading": "Cây năng lực",
+    "treeDescription": "12 năng lực thuộc ba lĩnh vực phát triển. Mở rộng để xem các chỉ báo theo từng mức.",
+    "devPhaseHeading": "Giai đoạn phát triển nghề nghiệp",
+    "devPhaseDescription": "Giai đoạn hiện tại theo từng lĩnh vực. Học sinh có thể lệch khỏi mặc định suy ra từ cấp học.",
+    "indicatorsLabel": "Các chỉ báo",
+    "noIndicators": "Chưa có chỉ báo cho năng lực này.",
+    "achievedLabel": "Đã đạt",
+    "notYetLabel": "Chưa đạt",
+    "currentDepthLabel": "Mức hiện tại",
+    "noProgressYet": "Chưa bắt đầu",
+    "depthProgressLabel": "{reached}/{total} mức đã đạt",
+    "areaLabel": "Lĩnh vực",
+    "depth": {
+      "K": "Nhận biết",
+      "A": "Thực hiện",
+      "R": "Vận dụng"
+    },
+    "depthShort": {
+      "K": "K",
+      "A": "A",
+      "R": "R"
+    },
+    "area": {
+      "A_personal": "Năng lực cá nhân",
+      "B_exploration": "Khám phá nghề nghiệp",
+      "C_building": "Xây dựng định hướng"
+    },
+    "devPhase": {
+      "awareness": "Nhận thức",
+      "exploration": "Khám phá",
+      "planning": "Lập kế hoạch"
+    }
   }
 }

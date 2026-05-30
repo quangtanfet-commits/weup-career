@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Design tokens — single source of truth (architecture.md §2.4).
+ * Tailwind theme (tailwind.config.ts) and shadcn/ui primitives both read these.
+ */
+:root {
+  /* Brand palette (architecture.md §2.1) */
+  --color-primary-600: #1d4ed8;
+  --color-primary-700: #1e40af;
+  --color-primary-50: #eff5ff;
+  --color-secondary-500: #0e9f8e;
+  --color-secondary-700: #0a6f63;
+  --color-ink-900: #0f172a;
+  --color-ink-600: #475569;
+  --color-surface: #fbfbfd;
+  --color-success-600: #15803d;
+  --color-warning-600: #b45309;
+  --color-danger-600: #dc2626;
+  --color-sensitive-700: #6d28d9;
+
+  /* Radii (architecture.md §2.3) */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.06);
+  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.1);
+  --shadow-lg: 0 12px 32px -8px rgb(15 23 42 / 0.18);
+
+  /* Typography token (font supplied via next/font as --font-sans) */
+  --font-sans: var(--font-be-vietnam-pro), Inter, system-ui, sans-serif;
+
+  /* shadcn/ui structural tokens (HSL channels) */
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 224 76% 48%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

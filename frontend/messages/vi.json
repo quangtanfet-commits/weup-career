@@ -1,0 +1,30 @@
+{
+  "app": {
+    "name": "WeUp Career",
+    "tagline": "Nền tảng hướng nghiệp quốc gia cho học sinh THCS & THPT"
+  },
+  "nav": {
+    "home": "Trang chủ",
+    "careers": "Thư viện nghề",
+    "login": "Đăng nhập",
+    "register": "Đăng ký"
+  },
+  "common": {
+    "loading": "Đang tải…",
+    "retry": "Thử lại",
+    "empty": "Chưa có dữ liệu"
+  },
+  "notFound": {
+    "title": "Không tìm thấy trang",
+    "description": "Trang bạn tìm không tồn tại hoặc đã được chuyển đi.",
+    "backHome": "Về trang chủ"
+  },
+  "careers": {
+    "title": "Thư viện nghề nghiệp",
+    "subtitle": "Khám phá các nghề theo Điều 5(a) — thông tin công khai, không cần đăng nhập.",
+    "empty": "Hiện chưa có nghề nào được công bố.",
+    "loadError": "Không tải được thư viện nghề. Vui lòng thử lại sau.",
+    "fieldLabel": "Lĩnh vực",
+    "trainingLevelLabel": "Trình độ đào tạo"
+  }
+}

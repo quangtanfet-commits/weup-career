@@ -1,0 +1,10 @@
+# Generated — do not format (overwritten by `npm run gen:api`)
+lib/api/schema.ts
+
+# Build / tooling artifacts
+.next/
+coverage/
+node_modules/
+next-env.d.ts
+tsconfig.tsbuildinfo
+openapi.json

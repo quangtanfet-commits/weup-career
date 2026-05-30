@@ -1,0 +1,81 @@
+# WeUp Career — E2E test stack overlay (architecture.md §11 F2, CI `e2e` job).
+#
+# Used as: `docker compose -f docker-compose.yml -f docker-compose.test.yml up`.
+# It brings up the full public-facing topology the Playwright suite needs:
+#
+#   nginx (:80)  ──/api/*──▶  backend  (FastAPI, seeded career + content)
+#                └──/──────▶  frontend (Next.js standalone, anonymous RSC reads)
+#
+# The base `docker-compose.yml` already defines `backend`; here we (a) make its
+# `.env` optional and inject a throwaway test secret so it boots in CI without a
+# committed secrets file, (b) add the Next.js frontend pointed at the backend
+# over the compose network, and (c) put nginx in front so the suite has a single
+# origin (http://localhost) exactly like production.
+
+services:
+  backend:
+    # The base service requires ./backend/.env; in CI that file does not exist.
+    # Mark it optional and provide the test config inline instead.
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      # A non-production throwaway secret; CI also exports SECRET_KEY but this
+      # guarantees the backend boots from `docker compose` alone.
+      SECRET_KEY: ${SECRET_KEY:-e2e-test-secret-not-for-production-use-only}
+      DATABASE_URL: sqlite+aiosqlite:////data/app.db
+      ENVIRONMENT: ${ENVIRONMENT:-test}
+      LOG_LEVEL: warning
+    # No host port needed — nginx reaches it on the internal network. (The base
+    # publishes 8000 for dev convenience; that is harmless here.)
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: runner
+    image: weup-career-frontend:test
+    environment:
+      NODE_ENV: production
+      # Server-only: anonymous RSC reads resolve the backend over the compose
+      # network. NEVER shipped to the client bundle (lib/api/config.ts).
+      BACKEND_INTERNAL_URL: http://backend:8000
+      # Browser-facing base for authed client calls — routed back through nginx.
+      NEXT_PUBLIC_API_BASE_URL: http://localhost/api/v1
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.test.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://localhost/api/v1/ready
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped

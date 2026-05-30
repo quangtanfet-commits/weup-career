@@ -5,7 +5,7 @@ import {
   getEditorContentItem,
   listEditorContent,
   publishContentVersion,
-} from "@/lib/api/endpoints/content";
+} from "@/lib/api/endpoints/content-editor";
 import { useAuthStore, type SessionUser } from "@/lib/auth/store";
 
 function jsonResponse(body: unknown, status = 200): Response {

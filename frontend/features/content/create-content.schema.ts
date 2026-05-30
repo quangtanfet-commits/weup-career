@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { CreateContentRequest } from "@/lib/api/endpoints/content";
+import type { CreateContentRequest } from "@/lib/api/endpoints/content-editor";
 
 /**
  * Create-content schema (architecture.md §4, §10; FR-90). A `content_editor`

@@ -16,7 +16,7 @@ import {
   type ContentItem,
   type CreateContentRequest,
   type EditorContentFilters,
-} from "@/lib/api/endpoints/content";
+} from "@/lib/api/endpoints/content-editor";
 
 /**
  * Content-editor data hooks (architecture.md §6.2, group `content`; FR-90).

@@ -24,6 +24,7 @@ vi.mock("@/features/content/useContent", () => ({
 import { CreateContentForm } from "@/features/content/CreateContentForm";
 import { ContentList } from "@/features/content/ContentList";
 import { EditorContentDetail } from "@/features/content/EditorContentDetail";
+import { ApiError } from "@/lib/api/errors";
 import { renderWithIntl, viMessages } from "./helpers/intl";
 
 const published = {
@@ -127,6 +128,112 @@ describe("content editor forms + list + detail", () => {
     await waitFor(() => expect(publishMutate).toHaveBeenCalledTimes(1));
     expect(
       await screen.findByText(viMessages.editor.publish.published),
+    ).toBeInTheDocument();
+  });
+
+  it("ContentList shows a loading status while pending", () => {
+    useEditorContentListMock.mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isError: false,
+      error: null,
+    });
+    renderWithIntl(<ContentList />);
+
+    expect(
+      screen.getByText(viMessages.editor.list.loading),
+    ).toBeInTheDocument();
+  });
+
+  it("ContentList shows the empty state when there is no content", () => {
+    useEditorContentListMock.mockReturnValue({
+      data: [],
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderWithIntl(<ContentList />);
+
+    expect(screen.getByText(viMessages.editor.list.empty)).toBeInTheDocument();
+  });
+
+  it("ContentList surfaces a backend error message", () => {
+    useEditorContentListMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new ApiError(401, "Phiên đã hết hạn", "UNAUTHORIZED"),
+    });
+    renderWithIntl(<ContentList />);
+
+    expect(screen.getByText("Phiên đã hết hạn")).toBeInTheDocument();
+  });
+
+  it("ContentList falls back to a generic error for non-ApiError failures", () => {
+    useEditorContentListMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new Error("boom"),
+    });
+    renderWithIntl(<ContentList />);
+
+    expect(
+      screen.getByText(viMessages.editor.genericError),
+    ).toBeInTheDocument();
+  });
+
+  it("EditorContentDetail shows a loading status while pending", () => {
+    useEditorContentItemMock.mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isError: false,
+      error: null,
+    });
+    renderWithIntl(<EditorContentDetail contentId="ct1" />);
+
+    expect(
+      screen.getByText(viMessages.editor.detail.loading),
+    ).toBeInTheDocument();
+  });
+
+  it("EditorContentDetail renders a neutral not-found on 404 (no id leak, CP-4)", () => {
+    useEditorContentItemMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new ApiError(404, "missing", "NOT_FOUND"),
+    });
+    renderWithIntl(<EditorContentDetail contentId="ct1" />);
+
+    expect(
+      screen.getByText(viMessages.editor.detail.notFound),
+    ).toBeInTheDocument();
+  });
+
+  it("EditorContentDetail surfaces a non-404 backend error message", () => {
+    useEditorContentItemMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new ApiError(500, "Lỗi máy chủ", "SERVER_ERROR"),
+    });
+    renderWithIntl(<EditorContentDetail contentId="ct1" />);
+
+    expect(screen.getByText("Lỗi máy chủ")).toBeInTheDocument();
+  });
+
+  it("EditorContentDetail falls back to a generic error for non-ApiError failures", () => {
+    useEditorContentItemMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new Error("boom"),
+    });
+    renderWithIntl(<EditorContentDetail contentId="ct1" />);
+
+    expect(
+      screen.getByText(viMessages.editor.genericError),
     ).toBeInTheDocument();
   });
 });

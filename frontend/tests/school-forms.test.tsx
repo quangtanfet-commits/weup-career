@@ -18,6 +18,7 @@ vi.mock("@/features/school/useSchool", () => ({
 import { CreateClassForm } from "@/features/school/CreateClassForm";
 import { AssignMemberForm } from "@/features/school/AssignMemberForm";
 import { ClassList } from "@/features/school/ClassList";
+import { ApiError } from "@/lib/api/errors";
 import { renderWithIntl, viMessages } from "./helpers/intl";
 
 describe("school-admin forms + list", () => {
@@ -107,6 +108,56 @@ describe("school-admin forms + list", () => {
     renderWithIntl(<ClassList schoolId={undefined} />);
     expect(
       screen.getByText(viMessages.schoolAdmin.classes.needSchool),
+    ).toBeInTheDocument();
+  });
+
+  it("ClassList shows a loading status while pending", () => {
+    useClassesMock.mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isError: false,
+      error: null,
+    });
+    renderWithIntl(<ClassList schoolId="s1" />);
+    expect(
+      screen.getByText(viMessages.schoolAdmin.classes.loading),
+    ).toBeInTheDocument();
+  });
+
+  it("ClassList shows the empty state when the school has no classes", () => {
+    useClassesMock.mockReturnValue({
+      data: [],
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderWithIntl(<ClassList schoolId="s1" />);
+    expect(
+      screen.getByText(viMessages.schoolAdmin.classes.empty),
+    ).toBeInTheDocument();
+  });
+
+  it("ClassList surfaces a backend error message", () => {
+    useClassesMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new ApiError(403, "Không có quyền", "FORBIDDEN"),
+    });
+    renderWithIntl(<ClassList schoolId="s1" />);
+    expect(screen.getByText("Không có quyền")).toBeInTheDocument();
+  });
+
+  it("ClassList falls back to a generic error for non-ApiError failures", () => {
+    useClassesMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new Error("boom"),
+    });
+    renderWithIntl(<ClassList schoolId="s1" />);
+    expect(
+      screen.getByText(viMessages.schoolAdmin.genericError),
     ).toBeInTheDocument();
   });
 });

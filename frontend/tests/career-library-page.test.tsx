@@ -77,9 +77,7 @@ describe("CareerLibraryPage (anonymous RSC)", () => {
 
     render(await CareerLibraryPage());
 
-    expect(
-      screen.getByText(vi_messages.careers.empty),
-    ).toBeInTheDocument();
+    expect(screen.getByText(vi_messages.careers.empty)).toBeInTheDocument();
   });
 
   it("renders an error alert when the backend read fails", async () => {

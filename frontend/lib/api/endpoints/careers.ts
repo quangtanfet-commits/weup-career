@@ -26,7 +26,5 @@ export async function listCareers(
 
 /** GET /careers/{careerId} — public career detail; throws ApiError 404 if unknown. */
 export async function getCareer(careerId: string): Promise<CareerDetail> {
-  return publicFetch<CareerDetail>(
-    `/careers/${encodeURIComponent(careerId)}`,
-  );
+  return publicFetch<CareerDetail>(`/careers/${encodeURIComponent(careerId)}`);
 }

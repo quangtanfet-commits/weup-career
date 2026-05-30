@@ -87,7 +87,9 @@ describe("apiFetch (authed client calls)", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 204 }),
     );
-    await expect(apiFetch("/auth/logout", { method: "POST" })).resolves.toBeUndefined();
+    await expect(
+      apiFetch("/auth/logout", { method: "POST" }),
+    ).resolves.toBeUndefined();
   });
 
   it("throws ApiError on a non-2xx response", async () => {

@@ -53,14 +53,14 @@ C4Container
     Person(student, "Học sinh / Giám hộ / Counselor", "Web browser")
 
     Container(nginx, "Nginx Reverse Proxy", "nginx:alpine", "TLS termination, static serving, /api routing, rate limiting L7")
-    Container(frontend, "Frontend SPA", "React 18 / TS / Vite", "SPA; REST + JSON; phân tầng UI theo school_level")
+    Container(frontend, "Frontend", "Next.js 15 App Router / React 19 / TS", "RSC public Điều 5a (SEO) + client app; REST + JSON; phân tầng UI theo school_level")
     Container(backend, "Backend API", "Python 3.12 / FastAPI / Uvicorn", "REST API; JWT; consent gate; xử lý dữ liệu nhạy cảm; audit")
     Container(recsvc, "Recommendation Engine", "Python module / service", "Gợi ý ngành/nghề/lộ trình CÓ GIẢI THÍCH; bias-tested; không tự quyết")
     ContainerDb(database, "Database", "SQLite 3.45 (MVP) → PostgreSQL", "Lưu trữ; trường nhạy cảm mã hóa; abstract qua SQLAlchemy")
     ContainerDb(audit, "Audit Store", "append-only (bảng/log)", "Audit truy cập dữ liệu nhạy cảm, consent, gợi ý (NFR-16)")
 
     Rel(student, nginx, "HTTPS", "TLS 1.3")
-    Rel(nginx, frontend, "Serves static", "filesystem")
+    Rel(nginx, frontend, "Proxies tới Next.js runtime (RSC/SSR + static assets)", "HTTP nội bộ")
     Rel(nginx, backend, "Proxies /api/*", "HTTP nội bộ")
     Rel(backend, database, "Read/write", "SQLAlchemy async")
     Rel(backend, recsvc, "Yêu cầu gợi ý (+rationale)", "nội bộ")
@@ -110,21 +110,21 @@ C4Component
 
 ---
 
-### Level 3 — Component Diagram — Frontend SPA
+### Level 3 — Component Diagram — Frontend (Next.js App Router)
 
 ```mermaid
 C4Component
-    title Component Diagram — Frontend SPA (React)
+    title Component Diagram — Frontend (Next.js 15 / React 19)
 
-    Container_Boundary(spa, "Frontend SPA") {
-        Component(router, "React Router", "react-router-dom v6", "Routing; guard theo vai trò; chặn route dữ liệu nếu account=pending_guardian_consent")
-        Component(authStore, "Auth Store", "Zustand + persist", "access token in-memory; refresh httpOnly; auto-refresh")
-        Component(apiClient, "API Client", "Axios + interceptors", "Bearer inject; 401→refresh→retry; correlation ID")
+    Container_Boundary(spa, "Frontend (Next.js)") {
+        Component(router, "App Router", "Next.js file routing", "(public) RSC SEO Điều 5a + (app) client; guard vai trò; chặn route [gate] nếu account=pending_guardian_consent")
+        Component(authStore, "Auth Store", "Zustand (in-memory)", "access token in-memory (KHÔNG persist/localStorage); refresh httpOnly cookie; auto-refresh")
+        Component(apiClient, "API Client", "typed fetch wrapper", "Bearer inject; 401→refresh→retry single-flight; correlation ID")
         Component(queryLayer, "Query Layer", "TanStack Query v5", "Server-state cache; stale-while-revalidate")
         Component(authPages, "Auth + Onboarding", "Login/Register/AgeGate", "Đăng ký → suy ra age_band → cổng giám hộ <16")
         Component(guardianFlow, "Guardian Consent Flow", "GuardianInvite/Consent", "Mời & xác nhận giám hộ; đồng xem")
         Component(assessment, "Assessment UI", "RIASEC/VIPS/MBTI", "Làm test; hiển thị kết quả kèm giải thích (cảnh báo nhạy cảm)")
-        Component(careerLib, "Career Library", "CareerList/CareerDetail", "Thư viện nghề; lọc theo RIASEC/lĩnh vực")
+        Component(careerLib, "Career Library", "CareerList/CareerDetail (RSC)", "Thư viện nghề công khai (anonymous, SEO); lọc theo RIASEC/lĩnh vực")
         Component(progressUI, "Progress Dashboard", "Competency 2-trục", "Biểu đồ tiến bộ K-A-R × dev_phase")
         Component(recoUI, "Recommendation UI", "RecoCard", "Gợi ý + lý do + nút xác nhận (không tự áp dụng)")
         Component(counselorUI, "Counselor Console", "3-tier", "DS học sinh được phân công; ghi phiên tư vấn")

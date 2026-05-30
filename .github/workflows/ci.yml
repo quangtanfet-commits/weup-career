@@ -442,7 +442,7 @@ jobs:
 
       # Backend — SARIF report (never fails)
       - name: Trivy report — backend
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:sha-${{ github.sha }}
           format: sarif
@@ -454,7 +454,7 @@ jobs:
 
       # Frontend — SARIF report (never fails)
       - name: Trivy report — frontend
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:sha-${{ github.sha }}
           format: sarif
@@ -464,17 +464,24 @@ jobs:
           exit-code: "0"
         if: github.event_name != 'pull_request'
 
+      - name: List Trivy SARIF artifacts
+        run: ls -la trivy-*.sarif || echo "no SARIF files produced"
+        if: always() && github.event_name != 'pull_request'
+
+      # Visibility only (Security tab); the real gate is the table steps below.
+      # Never block a merge on a SARIF-upload hiccup.
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: |
             trivy-backend.sarif
             trivy-frontend.sarif
+        continue-on-error: true
         if: always() && github.event_name != 'pull_request'
 
       # Backend — gate (fails on fixable CRITICAL/HIGH)
       - name: Trivy gate — backend
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:sha-${{ github.sha }}
           format: table
@@ -485,7 +492,7 @@ jobs:
 
       # Frontend — gate (fails on fixable CRITICAL/HIGH)
       - name: Trivy gate — frontend
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:sha-${{ github.sha }}
           format: table

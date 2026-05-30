@@ -38,14 +38,20 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: runner
+      args:
+        # NEXT_PUBLIC_* is inlined into the client bundle at BUILD time, so the
+        # browser-facing API base must be a build arg (a runtime `environment:`
+        # entry is never seen by the client bundle). This is the *origin only*
+        # — config.ts appends API_BASE_PATH (`/api/v1`) — so authed browser
+        # calls hit `http://localhost/api/v1/*` same-origin and nginx proxies
+        # `/api/` to the backend (no cross-origin :8000 hop, no CORS preflight).
+        NEXT_PUBLIC_API_BASE_URL: http://localhost
     image: weup-career-frontend:test
     environment:
       NODE_ENV: production
       # Server-only: anonymous RSC reads resolve the backend over the compose
       # network. NEVER shipped to the client bundle (lib/api/config.ts).
       BACKEND_INTERNAL_URL: http://backend:8000
-      # Browser-facing base for authed client calls — routed back through nginx.
-      NEXT_PUBLIC_API_BASE_URL: http://localhost/api/v1
     depends_on:
       backend:
         condition: service_healthy

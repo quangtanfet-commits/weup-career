@@ -17,6 +17,15 @@ RUN npm ci
 # at image-build time.
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# NEXT_PUBLIC_* values are inlined into the client bundle at BUILD time, not read
+# at runtime. The browser-facing API base therefore must be fixed here, not via a
+# compose `environment:` entry (which the client bundle never sees). Default to
+# the conventional dev host; the E2E/prod topology overrides it with the
+# same-origin edge so authed browser calls route back through nginx (no CORS).
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+
 RUN npm run build
 
 # ---- Stage 2: runtime --------------------------------------------------------

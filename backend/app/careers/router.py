@@ -1,18 +1,27 @@
 """Careers HTTP routes (spec.md §6, FR-30..33/40..42/50..51).
 
-**Public content — NOT consent-gated.** The career library and the 5c/5d
-learning content are public information under TT 16/2026 Điều 5(a). An under-16
-account still in ``pending_guardian_consent`` may read them (ADR-001 note,
-guardian-verification.md). So every route here depends on ``get_current_user``
-(Bearer auth) **only** — never ``require_career_data_consent``. This is the
-deliberate distinction from assessments/progress, which are sensitive personal
-data and *do* pass the consent gate.
+**Public content — anonymous-readable, NOT consent-gated.** The career library
+and the 5c/5d learning content are public information under TT 16/2026 Điều
+5(a). The frontend serves them as public SEO pages, so the GET routes here are
+readable WITHOUT a login (BE-1; ADR-001 §Consequences — Điều-5a là công khai).
+They depend on ``optional_current_user`` (Bearer optional) — never
+``require_career_data_consent``. This is the deliberate distinction from
+assessments/progress, which are sensitive personal data and *do* pass the
+consent gate. An under-16 account still in ``pending_guardian_consent`` may also
+read them (the consent gate never applies to Điều-5a).
+
+**Published-only invariant.** Every caller — anonymous or authenticated — only
+ever sees ``published`` content. An anonymous caller may NOT override the
+``status`` filter to surface ``draft``/``archived`` items: when the request is
+unauthenticated, ``status`` is forced to ``published``. Editor write/inspection
+routes (POST /content, POST /content/{id}/versions, GET /content/{id}) stay
+``require_content_editor`` (Bearer + DB-derived editor authority).
 
 - ``GET /careers``      — public library; filter by RIASEC group, field,
   training level, pathway type (incl. the GDNN / trường-trung-học-nghề branch).
 - ``GET /careers/{id}`` — one career; 404 if unknown.
 - ``GET /content``      — public 5c/5d content; filter by dieu5/competency/
-  dev_phase/school_level (published-only by default).
+  dev_phase/school_level (published-only by default; forced for anon).
 """
 
 from __future__ import annotations
@@ -22,7 +31,7 @@ from fastapi import APIRouter, Depends, Path, Query, status
 from app.api.deps import (
     CurrentUser,
     career_service,
-    get_current_user,
+    optional_current_user,
     require_content_editor,
 )
 from app.careers.schemas import (
@@ -52,7 +61,7 @@ async def list_careers(
     pathway_type: PathwayType | None = Query(
         None, description="Lọc theo nhánh phân luồng (gồm GDNN/trường trung học nghề)"
     ),
-    _current: CurrentUser = Depends(get_current_user),
+    _current: CurrentUser | None = Depends(optional_current_user),
     service: CareerService = Depends(career_service),
 ) -> list[CareerSummaryOut]:
     careers = await service.list_careers(
@@ -67,7 +76,7 @@ async def list_careers(
 @router.get("/careers/{career_id}", response_model=CareerDetailOut)
 async def get_career(
     career_id: str = Path(...),
-    _current: CurrentUser = Depends(get_current_user),
+    _current: CurrentUser | None = Depends(optional_current_user),
     service: CareerService = Depends(career_service),
 ) -> CareerDetailOut:
     career = await service.get_career(career_id)
@@ -83,15 +92,18 @@ async def list_content(
     status: ContentStatus | None = Query(
         ContentStatus.PUBLISHED, description="Trạng thái xuất bản (mặc định: published)"
     ),
-    _current: CurrentUser = Depends(get_current_user),
+    current: CurrentUser | None = Depends(optional_current_user),
     service: CareerService = Depends(career_service),
 ) -> list[ContentItemOut]:
+    # Published-only invariant: an anonymous caller can never override ``status``
+    # to surface draft/archived content. Force published when unauthenticated.
+    effective_status = status if current is not None else ContentStatus.PUBLISHED
     items = await service.list_content(
         dieu5_code=dieu5_code,
         competency_code=competency_code,
         dev_phase=dev_phase,
         school_level=school_level,
-        status=status,
+        status=effective_status,
     )
     return [ContentItemOut.from_model(c) for c in items]
 

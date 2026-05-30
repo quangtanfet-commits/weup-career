@@ -9,6 +9,7 @@ guardian consent (account ``pending_guardian_consent``) can GET /careers and
 from __future__ import annotations
 
 import pytest
+from app.core.database import Database
 from httpx import AsyncClient
 
 from tests.conftest import child_dob, register_payload
@@ -62,8 +63,13 @@ async def test_list_careers_returns_seeded(
         assert "training_level" in c
 
 
-async def test_list_careers_requires_auth(client: AsyncClient) -> None:
-    assert (await client.get("/api/v1/careers")).status_code == 401
+async def test_list_careers_anonymous_allowed(
+    client: AsyncClient, seeded_careers: dict[str, int]
+) -> None:
+    """BE-1: Điều-5(a) career library is anonymous-readable (no Authorization)."""
+    resp = await client.get("/api/v1/careers")
+    assert resp.status_code == 200
+    assert len(resp.json()) == seeded_careers["careers"]
 
 
 async def test_filter_careers_by_riasec(
@@ -153,10 +159,15 @@ async def test_get_career_unknown_404(client: AsyncClient, seeded_careers: dict[
     assert resp.status_code == 404
 
 
-async def test_get_career_requires_auth(
+async def test_get_career_anonymous_allowed(
     client: AsyncClient, seeded_careers: dict[str, int]
 ) -> None:
-    assert (await client.get("/api/v1/careers/x")).status_code == 401
+    """BE-1: a single career detail is anonymous-readable; unknown id → 404."""
+    listing = await client.get("/api/v1/careers")
+    cid = listing.json()[0]["id"]
+    assert (await client.get(f"/api/v1/careers/{cid}")).status_code == 200
+    # Anonymous still gets a clean 404 (not a 401) for an unknown id.
+    assert (await client.get("/api/v1/careers/does-not-exist")).status_code == 404
 
 
 # -- GET /content ----------------------------------------------------------
@@ -223,8 +234,69 @@ async def test_list_content_can_request_drafts(
     assert body and all(item["status"] == "draft" for item in body)
 
 
-async def test_list_content_requires_auth(client: AsyncClient) -> None:
-    assert (await client.get("/api/v1/content")).status_code == 401
+async def test_list_content_anonymous_published_only(
+    client: AsyncClient, seeded_careers: dict[str, int]
+) -> None:
+    """BE-1: anonymous /content is readable and shows ONLY published items."""
+    resp = await client.get("/api/v1/content")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body and all(item["status"] == "published" for item in body)
+
+
+async def test_anonymous_cannot_request_drafts(
+    client: AsyncClient, seeded_careers: dict[str, int]
+) -> None:
+    """BE-1 invariant: an anon caller cannot override status to see drafts.
+
+    The seed includes a DRAFT content item; ``?status=draft`` from an
+    unauthenticated caller is forced back to published-only, so the draft never
+    leaks (the response is published-only, never the draft).
+    """
+    resp = await client.get("/api/v1/content", params={"status": "draft"})
+    assert resp.status_code == 200
+    body = resp.json()
+    # Forced to published-only: no draft/archived row is ever returned to anon.
+    assert all(item["status"] == "published" for item in body)
+
+
+async def test_anonymous_cannot_request_archived(
+    client: AsyncClient, seeded_careers: dict[str, int]
+) -> None:
+    resp = await client.get("/api/v1/content", params={"status": "archived"})
+    assert resp.status_code == 200
+    assert all(item["status"] == "published" for item in resp.json())
+
+
+async def test_present_but_invalid_token_is_rejected_401(
+    client: AsyncClient, seeded_careers: dict[str, int]
+) -> None:
+    """BE-1: a malformed Bearer token is rejected (401), not downgraded to anon."""
+    resp = await client.get("/api/v1/careers", headers={"Authorization": "Bearer not-a-real-jwt"})
+    assert resp.status_code == 401
+    content_resp = await client.get(
+        "/api/v1/content", headers={"Authorization": "Bearer not-a-real-jwt"}
+    )
+    assert content_resp.status_code == 401
+
+
+async def test_authenticated_editor_can_request_drafts(
+    client: AsyncClient, db: Database, seeded_careers: dict[str, int]
+) -> None:
+    """BE-1: an authenticated caller keeps the existing ?status=draft ability.
+
+    The published-only force applies ONLY to anonymous callers; an authenticated
+    user passing ``?status=draft`` still gets drafts (existing behaviour kept).
+    """
+    from tests.conftest import grant_content_editor
+
+    user = await _register(client, email="draftview@example.com", dob="1990-01-01")
+    await grant_content_editor(db, user_id=user["id"])
+    token = await _token(client, "draftview@example.com")
+    resp = await client.get("/api/v1/content", params={"status": "draft"}, headers=_auth(token))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body and all(item["status"] == "draft" for item in body)
 
 
 # -- PUBLIC, NOT consent-gated (the core slice-4 distinction) --------------

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from typing import Any
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -244,13 +245,7 @@ def wellbeing_service(
 # -- auth dependencies ----------------------------------------------------
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    settings: Settings = Depends(settings_dep),
-) -> CurrentUser:
-    if credentials is None or not credentials.credentials:
-        raise AuthenticationError()
-    claims = decode_access_token(credentials.credentials, settings=settings)
+def _user_from_claims(claims: dict[str, Any]) -> CurrentUser:
     return CurrentUser(
         id=str(claims["sub"]),
         email=str(claims.get("email", "")),
@@ -259,6 +254,40 @@ async def get_current_user(
         account_status=str(claims.get("account_status", "")),
         roles=list(claims.get("roles", [])),
     )
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    settings: Settings = Depends(settings_dep),
+) -> CurrentUser:
+    if credentials is None or not credentials.credentials:
+        raise AuthenticationError()
+    claims = decode_access_token(credentials.credentials, settings=settings)
+    return _user_from_claims(claims)
+
+
+async def optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    settings: Settings = Depends(settings_dep),
+) -> CurrentUser | None:
+    """Resolve the Bearer identity if present; ``None`` for an anonymous caller.
+
+    Used by the Điều-5(a) public-read routes (career library + 5c/5d learning
+    content) so the frontend can serve them as public SEO pages WITHOUT a login
+    (BE-1; ADR-001 §Consequences — Điều-5a is công khai). Policy:
+
+    - **No / empty Authorization header → ``None``** (anonymous allowed). The
+      route then enforces the published-only invariant for unauthenticated
+      callers.
+    - **Present but invalid/expired token → 401** (``TokenError``). A malformed
+      token is an explicit attempt to authenticate; silently accepting it as
+      anonymous would mask client bugs and hide token-tampering, so it is
+      rejected rather than downgraded.
+    """
+    if credentials is None or not credentials.credentials:
+        return None
+    claims = decode_access_token(credentials.credentials, settings=settings)
+    return _user_from_claims(claims)
 
 
 async def require_content_editor(

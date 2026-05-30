@@ -57,7 +57,10 @@ describe("account endpoints (Bearer, R:self/guardian)", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(jsonResponse({ id: "u1" }));
 
-    await updateProfile({ school_level: "upper_secondary", user_type: "student" });
+    await updateProfile({
+      school_level: "upper_secondary",
+      user_type: "student",
+    });
 
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("http://localhost:8000/api/v1/me");

@@ -73,7 +73,11 @@ export function ChangePasswordForm() {
         label={t("security.currentLabel")}
         error={errors.current_password?.message}
       >
-        <Input type="password" autoComplete="current-password" {...register("current_password")} />
+        <Input
+          type="password"
+          autoComplete="current-password"
+          {...register("current_password")}
+        />
       </FormField>
 
       <FormField
@@ -82,7 +86,11 @@ export function ChangePasswordForm() {
         hint={t("security.newHint")}
         error={errors.new_password?.message}
       >
-        <Input type="password" autoComplete="new-password" {...register("new_password")} />
+        <Input
+          type="password"
+          autoComplete="new-password"
+          {...register("new_password")}
+        />
       </FormField>
 
       <FormField
@@ -90,7 +98,11 @@ export function ChangePasswordForm() {
         label={t("security.confirmLabel")}
         error={errors.confirm_password?.message}
       >
-        <Input type="password" autoComplete="new-password" {...register("confirm_password")} />
+        <Input
+          type="password"
+          autoComplete="new-password"
+          {...register("confirm_password")}
+        />
       </FormField>
 
       <Button type="submit" disabled={isSubmitting}>

@@ -18,7 +18,8 @@ import type { components } from "@/lib/api/schema";
  * the profile is READ at `GET /me/profile` but UPDATED via `PATCH /me`.
  */
 export type ProfileOut = components["schemas"]["ProfileOut"];
-export type ProfileUpdateRequest = components["schemas"]["ProfileUpdateRequest"];
+export type ProfileUpdateRequest =
+  components["schemas"]["ProfileUpdateRequest"];
 export type PasswordChangeRequest =
   components["schemas"]["PasswordChangeRequest"];
 export type DeletionOut = components["schemas"]["DeletionOut"];
@@ -81,8 +82,7 @@ export async function exportChildData(childId: string): Promise<DataExport> {
 export async function deleteChildAccount(
   childId: string,
 ): Promise<DeletionOut> {
-  return apiFetch<DeletionOut>(
-    `/me/children/${encodeURIComponent(childId)}`,
-    { method: "DELETE" },
-  );
+  return apiFetch<DeletionOut>(`/me/children/${encodeURIComponent(childId)}`, {
+    method: "DELETE",
+  });
 }

@@ -6,13 +6,15 @@
   "nav": {
     "home": "Trang chủ",
     "careers": "Thư viện nghề",
+    "content": "Nội dung hướng nghiệp",
     "login": "Đăng nhập",
     "register": "Đăng ký"
   },
   "common": {
     "loading": "Đang tải…",
     "retry": "Thử lại",
-    "empty": "Chưa có dữ liệu"
+    "empty": "Chưa có dữ liệu",
+    "all": "Tất cả"
   },
   "notFound": {
     "title": "Không tìm thấy trang",
@@ -25,13 +27,20 @@
     "empty": "Hiện chưa có nghề nào được công bố.",
     "loadError": "Không tải được thư viện nghề. Vui lòng thử lại sau.",
     "fieldLabel": "Lĩnh vực",
-    "trainingLevelLabel": "Trình độ đào tạo"
+    "trainingLevelLabel": "Trình độ đào tạo",
+    "viewDetail": "Xem chi tiết",
+    "backToList": "Về thư viện nghề",
+    "filtersHeading": "Lọc nghề nghiệp",
+    "riasecLabel": "Nhóm RIASEC",
+    "pathwayLabel": "Hướng phân luồng",
+    "applyFilters": "Áp dụng",
+    "clearFilters": "Xóa lọc"
   },
   "auth": {
     "email": "Email",
     "password": "Mật khẩu",
     "passwordHint": "Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và chữ số.",
-    "confirmPassword": "Nhập lại mật khẩu",
+    "confirmPassword": "Xác nhận mật khẩu",
     "dateOfBirth": "Ngày sinh",
     "dateOfBirthHint": "Dùng để xác định độ tuổi theo quy định bảo vệ trẻ em.",
     "userType": "Bạn là",
@@ -63,5 +72,47 @@
     "gateTitle": "Cần sự đồng ý của người giám hộ",
     "gateDescription": "Tính năng này chỉ khả dụng sau khi người giám hộ của bạn xác nhận đồng ý.",
     "gateCta": "Mời người giám hộ"
+  },
+  "careerDetail": {
+    "detailNotFound": "Không tìm thấy nghề này.",
+    "fieldLabel": "Lĩnh vực",
+    "trainingLevelLabel": "Trình độ đào tạo",
+    "riasecLabel": "Nhóm RIASEC",
+    "laborMarketLabel": "Triển vọng thị trường lao động",
+    "trainingPathsLabel": "Con đường đào tạo",
+    "requiredCompetenciesLabel": "Năng lực cần có",
+    "pathwaysLabel": "Các hướng phân luồng",
+    "sourceLabel": "Nguồn tham chiếu"
+  },
+  "content": {
+    "title": "Nội dung hướng nghiệp",
+    "subtitle": "Tài liệu hướng nghiệp công khai theo Điều 5 — không cần đăng nhập.",
+    "empty": "Hiện chưa có nội dung nào được công bố.",
+    "loadError": "Không tải được nội dung. Vui lòng thử lại sau.",
+    "notFound": "Không tìm thấy nội dung này.",
+    "backToList": "Về danh sách nội dung",
+    "dieu5Label": "Điều 5",
+    "competencyLabel": "Năng lực",
+    "schoolLevelLabel": "Cấp học"
+  },
+  "trainingLevel": {
+    "secondary": "Trung học",
+    "vocational": "Trung cấp nghề",
+    "college": "Cao đẳng",
+    "university": "Đại học",
+    "postgraduate": "Sau đại học"
+  },
+  "pathwayType": {
+    "academic": "Học thuật",
+    "vocational_secondary": "Trung học nghề",
+    "gdnn": "Giáo dục nghề nghiệp",
+    "labor": "Lao động trực tiếp"
+  },
+  "schoolLevel": {
+    "primary": "Tiểu học",
+    "lower_secondary": "THCS",
+    "upper_secondary": "THPT",
+    "tertiary": "Sau phổ thông",
+    "none": "Không xác định"
   }
 }

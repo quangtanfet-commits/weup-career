@@ -1,21 +1,24 @@
 "use client";
 
 import { API_BASE_PATH, publicApiBaseUrl } from "./config";
-import { toApiError } from "./errors";
+import { ApiError, toApiError } from "./errors";
 import { getAccessToken } from "@/lib/auth/store";
 
 /**
  * Browser-side typed fetch for authenticated/sensitive calls
  * (architecture.md §5.2). It injects the in-memory bearer token from the
- * Zustand auth store and sends cookies for the `/auth/*` refresh flow.
- *
- * F1 ships the token-injection + error-envelope handling; the single-flight
- * refresh-on-401 interceptor (CP-7) is layered on in the auth slice (F1 auth
- * pages) — this wrapper is the seam it hooks into.
+ * Zustand auth store, sends cookies for the `/auth/*` refresh flow, and on a
+ * 401 transparently refreshes the session once and retries (CP-7).
  */
 export interface ClientFetchOptions extends Omit<RequestInit, "body"> {
   readonly body?: unknown;
   readonly query?: Record<string, string | undefined>;
+  /**
+   * Skip the refresh-on-401 interceptor for this call. Set on `/auth/refresh`
+   * itself (a 401 there means "not logged in", not "token expired") so the
+   * interceptor never recurses into an infinite refresh loop.
+   */
+  readonly skipAuthRefresh?: boolean;
 }
 
 function buildUrl(path: string, query?: ClientFetchOptions["query"]): string {
@@ -29,13 +32,12 @@ function buildUrl(path: string, query?: ClientFetchOptions["query"]): string {
   return qs ? `${base}?${qs}` : base;
 }
 
-export async function apiFetch<T>(
-  path: string,
-  options: ClientFetchOptions = {},
-): Promise<T> {
-  const { body, query, headers, ...rest } = options;
-  const token = getAccessToken();
-
+function buildRequestInit(
+  body: unknown,
+  rest: Omit<RequestInit, "body">,
+  token: string | null,
+  headers?: HeadersInit,
+): RequestInit {
   const mergedHeaders = new Headers(headers);
   mergedHeaders.set("Accept", "application/json");
   if (body !== undefined) {
@@ -44,15 +46,16 @@ export async function apiFetch<T>(
   if (token) {
     mergedHeaders.set("Authorization", `Bearer ${token}`);
   }
-
-  const response = await fetch(buildUrl(path, query), {
+  return {
     ...rest,
     headers: mergedHeaders,
     // The refresh cookie is httpOnly and scoped to /api/v1/auth; include it.
     credentials: "include",
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  };
+}
 
+async function parse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     throw await toApiError(response);
   }
@@ -61,4 +64,43 @@ export async function apiFetch<T>(
     return undefined as T;
   }
   return (await response.json()) as T;
+}
+
+export async function apiFetch<T>(
+  path: string,
+  options: ClientFetchOptions = {},
+): Promise<T> {
+  const { body, query, headers, skipAuthRefresh, ...rest } = options;
+  const url = buildUrl(path, query);
+
+  const response = await fetch(
+    url,
+    buildRequestInit(body, rest, getAccessToken(), headers),
+  );
+
+  // Refresh-on-401 (architecture.md §5.2, CP-7): on a 401, attempt a single
+  // shared refresh, then replay the original request once with the new token.
+  // `skipAuthRefresh` short-circuits this for `/auth/refresh` itself.
+  if (response.status === 401 && !skipAuthRefresh) {
+    // Lazy import breaks the client ↔ session-restore module cycle.
+    const { restoreSession, notifyAuthLost } =
+      await import("@/lib/auth/session-restore");
+    const newToken = await restoreSession();
+    if (newToken === null) {
+      notifyAuthLost();
+      throw await toApiError(response);
+    }
+    const retry = await fetch(
+      url,
+      buildRequestInit(body, rest, newToken, headers),
+    );
+    if (retry.status === 401) {
+      // Still unauthorised after a fresh token → give up (no infinite retry).
+      notifyAuthLost();
+      throw new ApiError(401, "Phiên đăng nhập đã hết hạn", "UNAUTHORIZED");
+    }
+    return parse<T>(retry);
+  }
+
+  return parse<T>(response);
 }

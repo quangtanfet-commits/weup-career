@@ -1,32 +1,40 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { LoginForm } from "@/features/auth/LoginForm";
 
 export const metadata: Metadata = { title: "Đăng nhập" };
 
 /**
- * Login route placeholder (architecture.md §3, Luồng 1). The LoginForm
- * (POST /auth/login, RHF + Zod, in-memory token) is implemented in the F1 auth
- * work; F1 foundation ships the route so the `(auth)` group renders.
+ * Login route (architecture.md §3, Luồng 1; CP-7). Server-rendered card chrome
+ * wraps the client `LoginForm` (POST /auth/login, RHF + Zod, in-memory token).
  */
 export default async function LoginPage() {
-  const t = await getTranslations("nav");
+  const t = await getTranslations("auth");
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("login")}</CardTitle>
-        <CardDescription>
-          Biểu mẫu đăng nhập sẽ được bổ sung trong slice xác thực F1.
-        </CardDescription>
+        <CardTitle>{t("loginTitle")}</CardTitle>
+        <CardDescription>{t("loginDescription")}</CardDescription>
       </CardHeader>
-      <CardContent />
+      <CardContent>
+        <LoginForm />
+      </CardContent>
+      <CardFooter className="justify-center gap-1 text-sm text-ink-600">
+        <span>{t("noAccount")}</span>
+        <Link href="/register" className="font-medium text-primary-700">
+          {t("goRegister")}
+        </Link>
+      </CardFooter>
     </Card>
   );
 }

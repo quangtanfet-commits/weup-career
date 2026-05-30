@@ -93,7 +93,11 @@ describe("apiFetch (authed client calls)", () => {
   });
 
   it("throws ApiError on a non-2xx response", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    // A fresh response per call so the refresh-on-401 interceptor (which retries
+    // /auth/refresh) reads an independent, unconsumed body each time. With a
+    // single shared Response instance the body would be locked after the first
+    // read — a test artifact, not the production contract.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
       jsonResponse({ code: "UNAUTHORIZED", message: "Hết phiên" }, 401),
     );
     await expect(apiFetch("/auth/me")).rejects.toMatchObject({

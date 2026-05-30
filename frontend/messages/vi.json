@@ -302,5 +302,121 @@
       "3": "Tầng 3 — Tư vấn cá nhân"
     },
     "genericError": "Có lỗi xảy ra. Vui lòng thử lại sau."
+  },
+  "schoolAdmin": {
+    "schoolIdLabel": "Mã trường (school_id)",
+    "schoolIdHint": "Nhập mã trường bạn quản lý. Hệ thống sẽ kiểm tra quyền của bạn với trường này.",
+    "genericError": "Có lỗi xảy ra. Vui lòng thử lại sau.",
+    "classes": {
+      "pageTitle": "Quản lý lớp",
+      "pageDescription": "Tạo và xem các lớp trong trường bạn quản lý.",
+      "listTitle": "Danh sách lớp",
+      "listDescription": "Các lớp hiện có trong trường.",
+      "loading": "Đang tải danh sách lớp…",
+      "empty": "Chưa có lớp nào.",
+      "needSchool": "Hãy nhập mã trường để xem danh sách lớp.",
+      "gradeLabel": "Khối {grade}"
+    },
+    "createClass": {
+      "title": "Tạo lớp mới",
+      "description": "Đặt tên lớp và gắn khối/cấp tương ứng.",
+      "nameLabel": "Tên lớp",
+      "gradeLabel": "Khối/cấp",
+      "gradeHint": "Ví dụ: 10, 11, 12 hoặc tên khối.",
+      "submit": "Tạo lớp",
+      "submitting": "Đang tạo…",
+      "created": "Đã tạo lớp mới."
+    },
+    "members": {
+      "pageTitle": "Phân công thành viên",
+      "pageDescription": "Gán học sinh hoặc chuyên viên tư vấn vào trường, có thể theo lớp.",
+      "needSchool": "Hãy nhập mã trường để phân công thành viên."
+    },
+    "assignMember": {
+      "title": "Gán thành viên",
+      "description": "Nhập mã người dùng và chọn vai trò trong trường.",
+      "userIdLabel": "Mã người dùng (user_id)",
+      "userIdHint": "Mã định danh của người dùng cần gán.",
+      "roleLabel": "Vai trò trong trường",
+      "roleOption": {
+        "student": "Học sinh",
+        "counselor": "Chuyên viên tư vấn"
+      },
+      "classIdLabel": "Mã lớp (tùy chọn)",
+      "classIdHint": "Để trống nếu không gán vào lớp cụ thể.",
+      "submit": "Gán thành viên",
+      "submitting": "Đang gán…",
+      "assigned": "Đã gán thành viên vào trường."
+    }
+  },
+  "editor": {
+    "genericError": "Có lỗi xảy ra. Vui lòng thử lại sau.",
+    "status": {
+      "draft": "Bản nháp",
+      "published": "Đã xuất bản",
+      "archived": "Đã lưu trữ"
+    },
+    "depth": {
+      "K": "Biết (K)",
+      "A": "Vận dụng (A)",
+      "R": "Phản tư (R)"
+    },
+    "devPhase": {
+      "awareness": "Nhận thức",
+      "exploration": "Khám phá",
+      "planning": "Lập kế hoạch"
+    },
+    "schoolLevelOption": {
+      "primary": "Tiểu học",
+      "lower_secondary": "THCS",
+      "upper_secondary": "THPT",
+      "tertiary": "Sau phổ thông",
+      "none": "Không xác định"
+    },
+    "list": {
+      "pageTitle": "Quản lý nội dung",
+      "pageDescription": "Xem mọi nội dung ở tất cả trạng thái và tạo bản nháp mới.",
+      "loading": "Đang tải nội dung…",
+      "empty": "Chưa có nội dung nào.",
+      "meta": "Năng lực {competency} · Điều 5{dieu5} · phiên bản {version}"
+    },
+    "createContent": {
+      "title": "Tạo nội dung mới",
+      "description": "Mọi nội dung phải gắn đủ năm thẻ căn cứ: năng lực, Điều 5, độ sâu, giai đoạn và cấp học.",
+      "titleLabel": "Tiêu đề",
+      "bodyLabel": "Nội dung",
+      "competencyLabel": "Mã năng lực",
+      "competencyHint": "Ví dụ: NL1..NL12.",
+      "dieu5Label": "Mã Điều 5",
+      "dieu5Hint": "Ví dụ: a, b, c, d, đ.",
+      "depthLabel": "Độ sâu (K/A/R)",
+      "devPhaseLabel": "Giai đoạn phát triển",
+      "schoolLevelLabel": "Cấp học",
+      "sourceRefLabel": "Nguồn tham chiếu (tùy chọn)",
+      "sourceRefHint": "Trích dẫn nguồn để minh bạch căn cứ.",
+      "submit": "Tạo bản nháp",
+      "submitting": "Đang tạo…",
+      "created": "Đã tạo bản nháp nội dung."
+    },
+    "detail": {
+      "back": "← Quay lại danh sách",
+      "loading": "Đang tải nội dung…",
+      "notFound": "Không tìm thấy nội dung.",
+      "statusVersion": "{status} · phiên bản {version}",
+      "competency": "Mã năng lực",
+      "dieu5": "Mã Điều 5",
+      "depth": "Độ sâu",
+      "devPhase": "Giai đoạn",
+      "schoolLevel": "Cấp học",
+      "sourceRef": "Nguồn"
+    },
+    "publish": {
+      "title": "Xuất bản phiên bản mới",
+      "cardDescription": "Xuất bản sẽ tạo phiên bản mới và lưu trữ phiên bản đã xuất bản trước đó.",
+      "description": "Khi xuất bản, phiên bản đang có sẽ được nâng lên phiên bản kế tiếp.",
+      "submit": "Xuất bản phiên bản",
+      "submitting": "Đang xuất bản…",
+      "published": "Đã xuất bản phiên bản mới."
+    }
   }
 }

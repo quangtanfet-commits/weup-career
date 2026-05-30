@@ -98,10 +98,14 @@ test.describe("public content (anonymous)", () => {
   }) => {
     await page.goto("/");
 
-    await page.getByRole("link", { name: "Thư viện nghề" }).click();
+    // Scope to the header: the home page also renders hero CTAs with the same
+    // accessible names, so an unscoped locator is a strict-mode violation.
+    const header = page.getByRole("banner");
+
+    await header.getByRole("link", { name: "Thư viện nghề" }).click();
     await expect(page).toHaveURL(/\/careers$/);
 
-    await page.getByRole("link", { name: "Nội dung hướng nghiệp" }).click();
+    await header.getByRole("link", { name: "Nội dung hướng nghiệp" }).click();
     await expect(page).toHaveURL(/\/content$/);
   });
 });

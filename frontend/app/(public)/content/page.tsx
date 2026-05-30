@@ -19,6 +19,14 @@ export const metadata: Metadata = {
 
 const MAX_VISIBLE = 120;
 
+// The frontend image is built without a reachable backend, so a page that
+// fetches backend data must render at request time — otherwise Next.js bakes an
+// empty list into the static output at `docker build` and serves it forever.
+// The careers page is already dynamic (it reads `searchParams`); this page has
+// no such input, so force dynamic rendering explicitly. (`publicFetch` keeps its
+// own revalidate cache, so this does not disable data caching.)
+export const dynamic = "force-dynamic";
+
 export default async function ContentLibraryPage() {
   const t = await getTranslations("content");
 

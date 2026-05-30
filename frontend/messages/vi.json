@@ -26,5 +26,42 @@
     "loadError": "Không tải được thư viện nghề. Vui lòng thử lại sau.",
     "fieldLabel": "Lĩnh vực",
     "trainingLevelLabel": "Trình độ đào tạo"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Mật khẩu",
+    "passwordHint": "Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và chữ số.",
+    "confirmPassword": "Nhập lại mật khẩu",
+    "dateOfBirth": "Ngày sinh",
+    "dateOfBirthHint": "Dùng để xác định độ tuổi theo quy định bảo vệ trẻ em.",
+    "userType": "Bạn là",
+    "schoolLevel": "Cấp học",
+    "guardianNotice": "Vì bạn dưới 16 tuổi, tài khoản cần có sự đồng ý của người giám hộ. Sau khi đăng ký, bạn sẽ được hướng dẫn mời người giám hộ.",
+    "loginTitle": "Đăng nhập",
+    "loginDescription": "Đăng nhập để tiếp tục hành trình hướng nghiệp của bạn.",
+    "loginSubmit": "Đăng nhập",
+    "registerTitle": "Đăng ký",
+    "registerDescription": "Tạo tài khoản để bắt đầu khám phá nghề nghiệp.",
+    "registerSubmit": "Đăng ký",
+    "submitting": "Đang xử lý…",
+    "genericError": "Đã có lỗi xảy ra. Vui lòng thử lại.",
+    "noAccount": "Chưa có tài khoản?",
+    "haveAccount": "Đã có tài khoản?",
+    "goRegister": "Đăng ký",
+    "goLogin": "Đăng nhập"
+  },
+  "consent": {
+    "pageTitle": "Đồng ý của người giám hộ",
+    "pageDescription": "Vì bạn dưới 16 tuổi, một số tính năng cần sự đồng ý của người giám hộ trước khi sử dụng. Hãy mời người giám hộ của bạn bằng email bên dưới.",
+    "guardianEmail": "Email người giám hộ",
+    "relationship": "Mối quan hệ",
+    "sendInvite": "Gửi lời mời",
+    "resend": "Gửi lại lời mời",
+    "submitting": "Đang gửi…",
+    "inviteSent": "Đã gửi lời mời tới người giám hộ. Vui lòng nhờ họ kiểm tra email để xác nhận.",
+    "genericError": "Không gửi được lời mời. Vui lòng thử lại.",
+    "gateTitle": "Cần sự đồng ý của người giám hộ",
+    "gateDescription": "Tính năng này chỉ khả dụng sau khi người giám hộ của bạn xác nhận đồng ý.",
+    "gateCta": "Mời người giám hộ"
   }
 }

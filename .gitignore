@@ -28,3 +28,6 @@ report/
 
 # Authorized pentest engagement evidence — never commit (forged tokens, captures)
 .pentest/
+
+# Stray OpenAPI schema dump emitted at repo root by a tooling run — not source
+/\[CRED_85B58A47\]

@@ -1,0 +1,72 @@
+# WeUp Career — local full-stack deploy overlay (no GitHub CI/CD required).
+#
+# Used as: `docker compose -f docker-compose.yml -f docker-compose.local.yml up`
+# (or via `scripts/deploy-local.sh`). It brings up the same production-like
+# topology described in docs/architecture/deployment.md:
+#
+#   nginx (:80)  ──/api/*──▶  backend  (FastAPI, :8000)
+#                └──/──────▶  frontend (Next.js standalone, :3000 internal)
+#
+# Unlike docker-compose.test.yml, this overlay does NOT inject throwaway
+# secrets. The backend's SECRET_KEY / FIELD_ENCRYPTION_KEY come from
+# `backend/.env` (the env_file declared in the base compose), which
+# `scripts/deploy-local.sh` provisions with real random values on first run.
+# nginx reuses nginx/nginx.test.conf — a plain reverse proxy with no
+# test-specific logic, identical to the topology this local stack needs.
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: runner
+      args:
+        # NEXT_PUBLIC_* is inlined into the client bundle at BUILD time, so the
+        # browser-facing API base must be a build arg. Origin only — config.ts
+        # appends API_BASE_PATH (/api/v1) — so authed browser calls hit
+        # http://localhost/api/v1/* same-origin and nginx proxies /api/ to the
+        # backend (no cross-origin :8000 hop, no CORS preflight).
+        NEXT_PUBLIC_API_BASE_URL: http://localhost
+    image: weup-career-frontend:local
+    environment:
+      NODE_ENV: production
+      # Server-only: anonymous RSC reads resolve the backend over the compose
+      # network. Never shipped to the client bundle (lib/api/config.ts).
+      BACKEND_INTERNAL_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.test.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://localhost/api/v1/ready
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped

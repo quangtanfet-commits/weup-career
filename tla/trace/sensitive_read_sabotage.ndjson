@@ -1,0 +1,2 @@
+{"event":"CounselorReadStudent","user":"co1","state":{"student":"s1","sensitiveAccess":true}}
+{"event":"CounselorReadStudent","user":"co1","state":{"student":"s1","sensitiveAccess":false}}

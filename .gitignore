@@ -22,3 +22,9 @@ __pycache__/
 
 # Scratch source materials (distilled into docs/research + docs/legal)
 docs/temp/
+
+# Generated validation/security/report artifacts (regenerated from CI)
+report/
+
+# Authorized pentest engagement evidence — never commit (forged tokens, captures)
+.pentest/

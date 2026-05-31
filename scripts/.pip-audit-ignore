@@ -1,0 +1,13 @@
+# pip-audit tracked exceptions — one vuln ID per line (read by security-scan-native.sh).
+# Each entry MUST carry a justification + a revisit deadline. Tracked != ignored:
+# remove the entry the moment the fix becomes installable.
+#
+# PYSEC-2026-161 (GHSA-86qp-5c8j-p5mr) — starlette 0.49.3 Host-header URL reconstruction.
+#   Class: auth bypass WHEN auth depends on the reconstructed URL path.
+#   Applicability to WeUp: LOW. Auth is JWT HS256 bearer-token (Authorization header),
+#     not Host-header / reconstructed-path dependent. No route authz reads request.url host.
+#   Fix availability: BLOCKED upstream. Fix is starlette>=1.0.1, but FastAPI 0.120.4 pins
+#     starlette<0.50.0,>=0.40.0. No FastAPI release supports starlette 1.x yet — the fix
+#     is not installable without a FastAPI major upgrade that does not exist as of 2026-05-31.
+#   Revisit deadline: 2026-08-31 (or sooner when FastAPI ships starlette 1.x support).
+PYSEC-2026-161

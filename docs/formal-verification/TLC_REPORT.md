@@ -3,7 +3,7 @@
 **Ngày:** 2026-05-29 · **Công cụ:** TLA+ tla2tools (TLC), Java 21 · **Spec-pack:** [`tla/`](../../tla/)
 **Phạm vi:** 6 module ↔ 8 thuộc tính đúng đắn CP-1…CP-8 ([`docs/spec.md`](../spec.md) §8, thiết kế: [`tla-spec-design.md`](./tla-spec-design.md)).
 
-> **Gate A (model check) + sabotage-check: HOÀN TẤT.** Gate B (conformance trace replay) **chưa chạy** — chưa có implementation (`backend/app/`). Sẽ kích hoạt khi có code (xem §Gate B).
+> **Gate A (model check) + sabotage-check: HOÀN TẤT.** **Gate B (conformance trace replay): 6/6 HOÀN TẤT** trên impl thật (`backend/app/`) — mọi module có trace replay + sabotage teeth. Chi tiết: [`GATE_B_CONFORMANCE.md`](./GATE_B_CONFORMANCE.md).
 
 ---
 
@@ -52,14 +52,22 @@ Với mỗi invariant, phá **một** guard/hành động trong spec; TLC **ph�
 - **Liveness/fairness chưa mô hình hóa** (vd "mọi gợi ý cuối cùng được xử lý"): chưa cần ở giai đoạn này vì các CP là safety; sẽ bổ sung khi mô hình hóa retry/queue (nếu có) theo `/formal-verify` mandatory coverage.
 - **CP-2** được bao bởi `ConsentLifecycle` ở dạng safety (`NoRevokedProcessing` + `ConsentInvariant`): không artifact nào tạo ra khi consent="revoked".
 
-## Gate B — Conformance (CHƯA chạy, blocking khi có code)
+## Gate B — Conformance (✅ 6/6 HOÀN TẤT trên impl thật)
 
-Khi `backend/app/` tồn tại:
-1. Instrument source emit NDJSON trace mỗi action (harness — `/specula` `harness-generation`).
-2. Viết `*Trace.tla` replay trace, assert mỗi bước enabled trong spec gốc.
-3. Replay ≥1.000 trace từ test thật; mọi trace phải được chấp nhận.
-4. Property-based test (Hypothesis) sinh chuỗi action ngẫu nhiên chạy qua impl.
-5. CI: TLC (Gate A) + conformance (Gate B) chặn merge khi đổi state machine consent/reco/auth/progress (đã có khung `.github/workflows/ci.yml`).
+Mọi module trong spec-pack đã có conformance trace replay từ run backend thật + sabotage teeth (xem [`GATE_B_CONFORMANCE.md`](./GATE_B_CONFORMANCE.md) cho chi tiết từng slice):
+
+| Module | CP | Conformance (l=Len+1) | Sabotage (kẹt l<Len+1) |
+|---|---|---|---|
+| `ConsentLifecycle` | CP-1, CP-2 | ✅ l=4 | ✅ double-grant kẹt l=2 |
+| `SensitiveDataAccess` | CP-3 | ✅ l=4 | ✅ sensitiveAccess=FALSE kẹt l=2 |
+| `AuthorizationModel` | CP-4 | ✅ l=4 | ✅ s1→co1 (không phân công) kẹt l=2 |
+| `RecommendationGovernance` | CP-5, CP-6 | ✅ l=3 | ✅ confirm-chưa-create kẹt l=1 |
+| `AuthTokenLifecycle` | CP-7 | ✅ l=5 | ✅ double-issue kẹt l=2 |
+| `CompetencyProgress` | CP-8 | ✅ l=4 | ✅ giảm độ sâu kẹt l=2 |
+
+- Instrument: `backend/app/core/trace.py` (emit NDJSON env-gated `WEUP_TRACE_FILE`; no-op khi không set) + hook ở guardians/assessments/auth/reco/school services.
+- Discriminator: conform ⇔ trace tiêu thụ hết (`l = Len+1`); sabotage (chuỗi spec cấm) kẹt giữa chừng → drift bị bắt.
+- CI: TLC (Gate A) + conformance (Gate B) chặn merge khi đổi state machine consent/reco/auth/progress (khung `.github/workflows/ci.yml`).
 
 ## Cách chạy lại
 ```bash

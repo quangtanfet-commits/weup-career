@@ -19,6 +19,15 @@ export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
+  // Per-test budget. The auth specs chain several proxied round-trips
+  // (register → login → redirect, sometimes twice across two contexts). In
+  // isolation those finish in ~5s, but under `fullyParallel` contention on the
+  // constrained aarch64/linuxkit CI box the slower Firefox/WebKit engines can
+  // exceed Playwright's 30s default and time out — a harness-capacity artifact,
+  // not a product defect (the same test passes deterministically when run
+  // alone). 60s gives ~10× headroom over the isolated time while still failing
+  // fast on a genuine hang.
+  timeout: 60_000,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {

@@ -77,16 +77,43 @@ Instrument `RecoService`: `generate()`→`RecommendationCreated`, `confirm()`→
 
 ## Mở rộng slice 6 — CP-4 relational RBAC (Gate A + integration)
 
+> **Cập nhật 2026-05-31:** slice 6 ban đầu phủ CP-4 bằng Gate A + integration. Slice 7 (dưới) **bổ sung trace harness thời gian** cho CP-4 (và CP-3) — conformance giờ có harness replay riêng, không chỉ dựa integration. Phần dưới giữ nguyên làm bối cảnh.
+
 CP-4 (counselor↔student, guardian↔child ownership) là **predicate phân quyền** (truy vấn quan hệ tại từng request), KHÔNG phải máy trạng thái thời gian như consent/token/reco. Vì vậy:
 - **Gate A** — `AuthorizationModelMC`: "Model checking completed. No error" (128 distinct states, `OwnershipInvariant` giữ). `AuthorizationModelSab`: "Invariant **OwnershipInvariant** is violated" (cấp quyền cross-relation → bị bắt; teeth).
 - **Conformance** phủ bởi integration trên app thật (không cần trace harness thời gian): counselor cùng trường đọc được học sinh được phân công; **khác trường → 404**; class-scope; counselor đọc dữ liệu nhạy cảm → **de-sensitized** (không payload thô) + **1 CP-3 audit**; **G-6** giám hộ verified xem + confirm reco của trẻ (confirmed_by=người thật, unrelated→404) — tái dùng `RecommendationConfirmed` trace của Gate B slice 5.
 
+## Mở rộng slice 7 — CP-3 SensitiveDataAccess + CP-4 AuthorizationModel trace harness (✅ đạt 6/6)
+
+Một emit thật `CounselorReadStudent` (tại `app/school/service.py`, bắn SAU khi `_can_access` qua + đúng 1 audit nhạy cảm được ghi) drive **CẢ HAI** CP từ hai góc. Sinh trace thật bằng pytest qua ASGI app + sqlite: cùng 1 counselor đọc cùng 1 student 3 lần; relabel UUID counselor→`co1`, student→`s1`. Trace dùng chung: `sensitive_read_trace.ndjson`.
+
+**CP-3 — SensitiveDataAccess** (`SensitiveDataAccessTrace.tla` + `…Base.tla`, counter `reads`/`audits`, `ReadSensitive` tăng song song; `AuditCompleteness == reads = audits`):
+
+| Run | Trace | Kết quả TLC | Diễn giải |
+|---|---|---|---|
+| **Conformance** | `[Read, Read, Read]` (thật, sensitiveAccess=TRUE) | Deadlock @ State 4, **l=4 (=Len+1)** | ✅ Tiêu thụ hết; mỗi đọc nhạy cảm → đúng 1 audit (`reads=audits=3`); `AuditCompleteness` giữ ở MỌI state → CP-3 không bao giờ đọc thiếu/thừa audit |
+| **Sabotage** | `[Read(TRUE), Read(FALSE)]` (`sensitive_read_sabotage.ndjson`) | Deadlock @ State 2, **l=2 (≠Len+1)** | ✅ Event #2 không tiêu thụ (`TraceRead` yêu cầu `sensitiveAccess=TRUE`) → drift bị bắt |
+
+**CP-4 — AuthorizationModel** (`AuthorizationModelTrace.tla` + `…Base.tla`, `CanAccess` giữ nguyên cấu trúc vị từ spec đã verify; `CounselorOf = {<<co1,s1>>}`; `OwnershipInvariant == \A g \in grants : CanAccess(g[1],g[2])`):
+
+| Run | Trace | Kết quả TLC | Diễn giải |
+|---|---|---|---|
+| **Conformance** | `[co1→s1, co1→s1, co1→s1]` (thật) | Deadlock @ State 4, **l=4 (=Len+1)** | ✅ Tiêu thụ hết; mỗi `Access` chỉ enabled khi `CanAccess` (co1 được phân công s1); `OwnershipInvariant` giữ → impl không cấp quyền đọc vượt quan hệ phân công |
+| **Sabotage** | `[co1→s1, s1→co1]` (`authorization_sabotage.ndjson`, s1 đọc co1 — không phân công) | Deadlock @ State 2, **l=2 (≠Len+1)** | ✅ Event #2 không tiêu thụ (`CanAccess(s1,co1)`=FALSE) → drift bị bắt |
+
+> Discriminator nhất quán: conform ⇔ `l` đạt `Len+1=4`; cả hai sabotage kẹt `l=2`. Cùng một trace thật được validate từ hai vị từ độc lập (đếm audit CP-3 + quan hệ phân quyền CP-4) — chặt hơn "CP-4 = chỉ Gate A + integration" của slice 6.
+
+**Verdict 6/6:** mọi module trong spec-pack giờ có conformance trace replay + sabotage teeth — ConsentLifecycle (CP-1/CP-2), CompetencyProgress (CP-8), AuthTokenLifecycle (CP-7), RecommendationGovernance (CP-5/CP-6), **SensitiveDataAccess (CP-3)**, **AuthorizationModel (CP-4)**.
+
 ## Artifact
-- Harness: `backend/app/core/trace.py` (emit + token_label; emit loại key `None` để JSON parse được trong TLA) + hook ở `backend/app/guardians/service.py`, `backend/app/assessments/service.py`, `backend/app/auth/service.py`, `backend/app/reco/service.py` (env-gated).
+- Harness: `backend/app/core/trace.py` (emit + token_label; emit loại key `None` để JSON parse được trong TLA) + hook ở `backend/app/guardians/service.py`, `backend/app/assessments/service.py`, `backend/app/auth/service.py`, `backend/app/reco/service.py`, `backend/app/school/service.py` (env-gated).
 - Token spec: `tla/trace/AuthTokenTrace.tla`, `AuthTokenTraceBase.tla`, `AuthTokenTrace.cfg`, `token_trace.ndjson`.
 - Reco spec: `tla/trace/RecommendationTrace.tla`, `RecommendationTraceBase.tla`, `RecommendationTrace.cfg`, `recommendation_trace.ndjson`.
-- Spec: `tla/trace/ConsentTrace.tla`, `ConsentTraceBase.tla`, `ConsentTrace.cfg`.
-- Trace: `tla/trace/consent_trace.ndjson`.
+- Consent spec: `tla/trace/ConsentTrace.tla`, `ConsentTraceBase.tla`, `ConsentTrace.cfg`, `consent_trace.ndjson`, `consent_artifact_trace.ndjson`.
+- Competency spec: `tla/trace/CompetencyProgressTrace.tla`, `CompetencyProgressTraceBase.tla`, `CompetencyProgressTrace.cfg`, `competency_trace.ndjson`.
+- **SensitiveData spec (CP-3, slice 7):** `tla/trace/SensitiveDataAccessTrace.tla`, `SensitiveDataAccessTraceBase.tla`, `SensitiveDataAccessTrace.cfg`.
+- **Authorization spec (CP-4, slice 7):** `tla/trace/AuthorizationModelTrace.tla`, `AuthorizationModelTraceBase.tla`, `AuthorizationModelTrace.cfg`.
+- **Trace dùng chung CP-3/CP-4:** `tla/trace/sensitive_read_trace.ndjson` (thật, relabel co1/s1); sabotage: `sensitive_read_sabotage.ndjson`, `authorization_sabotage.ndjson`.
 
 ## Cách chạy lại
 ```bash
@@ -99,3 +126,5 @@ CP-4 (counselor↔student, guardian↔child ownership) là **predicate phân quy
 ```
 
 > **Verdict slice 1:** Gate B **PASS** cho ConsentLifecycle (CP-1/CP-2 transition conformance) + sabotage xác nhận. Đóng **P-5** ở mức slice-1; mở rộng (CP-1 artifact, CP-7 token, đa-trẻ) theo slice.
+>
+> **Verdict tổng (2026-05-31):** Gate B **6/6** — mọi module spec-pack có conformance trace replay + sabotage teeth (CP-1…CP-8 đều phủ). Không module nào chỉ còn "Gate A + integration".

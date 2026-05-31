@@ -85,8 +85,12 @@ test.describe("login (CP-7)", () => {
     await fresh.getByRole("button", { name: "Đăng nhập", exact: true }).click();
 
     // Generic credential error is surfaced (anti-enumeration) and the user is
-    // not navigated into the app.
-    await expect(fresh.getByRole("alert")).toBeVisible();
+    // not navigated into the app. Assert the specific message rather than a bare
+    // role=alert: WebKit also exposes Next's empty __next-route-announcer__ with
+    // role=alert, which trips strict mode.
+    await expect(
+      fresh.getByText("Email hoặc mật khẩu không đúng"),
+    ).toBeVisible();
     await expect(fresh).toHaveURL(/\/login$/);
     await ctx.close();
   });
@@ -110,7 +114,9 @@ test.describe("registration errors", () => {
     });
     await fresh.getByRole("button", { name: "Đăng ký", exact: true }).click();
 
-    await expect(fresh.getByRole("alert")).toBeVisible();
+    // Specific duplicate-email message; see the wrong-password test above for why
+    // a bare role=alert is avoided (WebKit route-announcer collision).
+    await expect(fresh.getByText("Email đã được đăng ký")).toBeVisible();
     await expect(fresh).toHaveURL(/\/register$/);
     await ctx.close();
   });

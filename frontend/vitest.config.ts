@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vitest/config";
+import { defineConfig, type Plugin } from "vitest/config";
 
 /**
  * Vitest runs independently of the Next.js runtime (architecture.md §1): it
@@ -8,7 +8,11 @@ import { defineConfig } from "vitest/config";
  * tsconfig so imports resolve identically in tests and app code.
  */
 export default defineConfig({
-  plugins: [react()],
+  // Storybook 10 hoists vite 8 to the top level while vitest 2 keeps its own
+  // vite 5 nested, so `react()` is typed against a different vite copy than
+  // vitest's defineConfig expects. Runtime is unaffected (each tool uses its
+  // own vite); this cast bridges the duplicate-major type trees for tsc.
+  plugins: [react() as unknown as Plugin[]],
   resolve: {
     alias: {
       "@": resolve(__dirname, "."),

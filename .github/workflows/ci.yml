@@ -193,6 +193,48 @@ jobs:
           flags: frontend
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  # ── 4b. Storybook build + Chromatic visual regression ───────
+  # build-storybook ALWAYS runs (deterministic, no external service) — a broken
+  # story or a primitive API drift fails the gate. The Chromatic publish step
+  # runs only when CHROMATIC_PROJECT_TOKEN is set (the repo owner provisions it
+  # at chromatic.com → project settings); without it, visual regression is a
+  # no-op rather than a hard failure. See docs/testing/chromatic.md.
+  storybook:
+    name: "📚 Storybook + Chromatic"
+    runs-on: ubuntu-latest
+    if: ${{ needs.detect.outputs.has_frontend == 'true' }}
+    needs: [detect, lint-frontend]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Chromatic needs full history for baseline diffing
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Storybook (headless gate)
+        run: npm run build-storybook
+
+      - name: Publish to Chromatic
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        if: ${{ env.CHROMATIC_PROJECT_TOKEN != '' }}
+        uses: chromaui/action@v17
+        with:
+          workingDir: frontend
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          storybookBuildDir: storybook-static
+          exitZeroOnChanges: false # unapproved visual drift fails the PR
+
   # ── 5. Security Scan ─────────────────────────────────────────
   security:
     name: "🔒 Security Scan"
@@ -517,6 +559,7 @@ jobs:
       - lint-frontend
       - test-backend
       - test-frontend
+      - storybook
       - security
       - e2e
       - build-and-scan

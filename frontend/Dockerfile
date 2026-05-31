@@ -9,8 +9,10 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Install dependencies from the lockfile for reproducible builds.
-COPY package.json package-lock.json ./
+# Install dependencies from the lockfile for reproducible builds. .npmrc carries
+# legacy-peer-deps=true — Storybook 10 hoists vite@8 while @vitejs/plugin-react@4
+# peers on vite<=7, so npm ci needs it to resolve (matches local + CI installs).
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 
 # Build the standalone server. schema.ts is committed, so no backend is needed

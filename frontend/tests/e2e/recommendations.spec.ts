@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { registerAdult } from "./fixtures/auth";
+
 /**
  * F5 — recommendations slice (architecture.md §3, §10 L5, §11; FR-60..63,
  * CP-5/CP-6).
@@ -34,60 +36,6 @@ import { expect, test } from "@playwright/test";
  *     under-16-with-consent + assessment/progress fixture is added later, a
  *     gated/generate E2E can be appended.
  */
-
-function uniqueEmail(): string {
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `f5-reco-${Date.now()}-${rand}@example.vn`;
-}
-
-/**
- * Fill a react-hook-form field so the value reliably sticks.
- *
- * On WebKit the first `fill()` can land before Next.js finishes hydrating the
- * controlled input; hydration then resets it to its default ("") and the typed
- * value is silently lost. Re-filling until the value holds makes the helper
- * deterministic across Chromium/Firefox/WebKit instead of racing hydration.
- */
-async function fillAndConfirm(
-  field: import("@playwright/test").Locator,
-  value: string,
-) {
-  await expect(async () => {
-    await field.fill(value);
-    await expect(field).toHaveValue(value, { timeout: 1000 });
-  }).toPass({ timeout: 10_000 });
-}
-
-/** Register a fresh adult (working) account through the UI and land in the app. */
-async function registerAdult(page: import("@playwright/test").Page) {
-  await page.goto("/register");
-
-  await fillAndConfirm(
-    page.getByLabel("Email", { exact: true }),
-    uniqueEmail(),
-  );
-  // Adult: born well over 16 years ago so the account is `active`, not gated.
-  await fillAndConfirm(
-    page.getByLabel("Ngày sinh", { exact: true }),
-    "1995-01-01",
-  );
-  await page.getByLabel("Bạn là").selectOption({ value: "working" });
-  await page.getByLabel("Cấp học").selectOption({ value: "none" });
-  // "Mật khẩu" is a prefix of the confirm label, so match it exactly.
-  await fillAndConfirm(
-    page.getByLabel("Mật khẩu", { exact: true }),
-    "WeUpPass123",
-  );
-  await fillAndConfirm(
-    page.getByLabel("Xác nhận mật khẩu", { exact: true }),
-    "WeUpPass123",
-  );
-
-  await page.getByRole("button", { name: "Đăng ký", exact: true }).click();
-
-  // Adults are routed to the dashboard (not /consent).
-  await expect(page).toHaveURL(/\/dashboard$/);
-}
 
 test.describe("recommendations — entry page (authenticated adult)", () => {
   test("loads the entry page with no consent gate and states the human-in-the-loop rule", async ({

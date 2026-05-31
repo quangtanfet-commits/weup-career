@@ -418,5 +418,94 @@
       "submitting": "Đang xuất bản…",
       "published": "Đã xuất bản phiên bản mới."
     }
+  },
+  "account": {
+    "genericError": "Có lỗi xảy ra. Vui lòng thử lại sau.",
+    "ageBand": {
+      "under_16": "Dưới 16 tuổi",
+      "16_17": "16–17 tuổi",
+      "adult": "Từ 18 tuổi trở lên"
+    },
+    "schoolLevelOption": {
+      "primary": "Tiểu học",
+      "lower_secondary": "THCS",
+      "upper_secondary": "THPT",
+      "tertiary": "Sau phổ thông",
+      "none": "Không xác định"
+    },
+    "userTypeOption": {
+      "student": "Học sinh",
+      "working": "Người đi làm"
+    },
+    "profile": {
+      "pageTitle": "Hồ sơ cá nhân",
+      "pageDescription": "Xem và cập nhật thông tin hồ sơ của bạn.",
+      "loading": "Đang tải hồ sơ…",
+      "emailLabel": "Email",
+      "ageBandLabel": "Nhóm tuổi",
+      "schoolLevelLabel": "Cấp học",
+      "userTypeLabel": "Bạn là",
+      "submit": "Lưu thay đổi",
+      "submitting": "Đang lưu…",
+      "saved": "Đã lưu hồ sơ."
+    },
+    "security": {
+      "pageTitle": "Đổi mật khẩu",
+      "pageDescription": "Để đổi mật khẩu, bạn cần nhập mật khẩu hiện tại.",
+      "currentLabel": "Mật khẩu hiện tại",
+      "newLabel": "Mật khẩu mới",
+      "newHint": "Mật khẩu mới tối thiểu 8 ký tự.",
+      "confirmLabel": "Xác nhận mật khẩu mới",
+      "submit": "Đổi mật khẩu",
+      "submitting": "Đang đổi mật khẩu…",
+      "changed": "Đã đổi mật khẩu thành công."
+    },
+    "data": {
+      "export": {
+        "pageTitle": "Tải dữ liệu của tôi",
+        "pageDescription": "Bạn có quyền tải về toàn bộ dữ liệu cá nhân của mình (Luật Dữ liệu cá nhân 91/2025).",
+        "submit": "Xuất dữ liệu của tôi",
+        "submitting": "Đang xuất dữ liệu…",
+        "ready": "Dữ liệu của bạn đã sẵn sàng để tải về.",
+        "download": "Tải tệp JSON",
+        "previewLabel": "Xem trước dữ liệu xuất ra"
+      },
+      "delete": {
+        "pageTitle": "Yêu cầu xóa tài khoản",
+        "pageDescription": "Bạn có quyền yêu cầu xóa tài khoản (Luật Dữ liệu cá nhân 91/2025).",
+        "description": "Tài khoản sẽ được xóa mềm và vẫn có thể khôi phục trong thời hạn khôi phục. Sau thời hạn này, dữ liệu sẽ bị xóa vĩnh viễn.",
+        "start": "Yêu cầu xóa tài khoản",
+        "confirmPrompt": "Bạn có chắc chắn muốn xóa tài khoản? Thao tác này sẽ xóa mềm tài khoản của bạn.",
+        "confirm": "Xác nhận xóa tài khoản",
+        "cancel": "Hủy",
+        "submitting": "Đang xử lý…",
+        "done": "Đã tiếp nhận yêu cầu xóa tài khoản.",
+        "recoveryWindow": "Bạn có thể khôi phục tài khoản trong vòng {days} ngày.",
+        "purgeDue": "Dữ liệu sẽ bị xóa vĩnh viễn vào ngày {date}."
+      }
+    },
+    "children": {
+      "pageTitle": "Quyền dữ liệu của trẻ",
+      "pageDescription": "Là người giám hộ, bạn có thể thực hiện quyền dữ liệu thay cho trẻ được liên kết (Luật Dữ liệu cá nhân 91/2025).",
+      "childIdLabel": "Mã định danh của trẻ",
+      "childIdHint": "Nhập mã định danh tài khoản của trẻ được liên kết với bạn.",
+      "export": {
+        "submit": "Xuất dữ liệu của trẻ",
+        "submitting": "Đang xuất dữ liệu…",
+        "ready": "Dữ liệu của trẻ đã sẵn sàng để tải về.",
+        "download": "Tải tệp JSON",
+        "previewLabel": "Xem trước dữ liệu của trẻ"
+      },
+      "delete": {
+        "start": "Yêu cầu xóa tài khoản của trẻ",
+        "confirmPrompt": "Bạn có chắc chắn muốn xóa tài khoản của trẻ? Thao tác này sẽ xóa mềm tài khoản của trẻ.",
+        "confirm": "Xác nhận xóa",
+        "cancel": "Hủy",
+        "submitting": "Đang xử lý…",
+        "done": "Đã tiếp nhận yêu cầu xóa tài khoản của trẻ.",
+        "recoveryWindow": "Có thể khôi phục tài khoản của trẻ trong vòng {days} ngày.",
+        "purgeDue": "Dữ liệu sẽ bị xóa vĩnh viễn vào ngày {date}."
+      }
+    }
   }
 }

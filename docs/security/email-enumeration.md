@@ -38,7 +38,7 @@ Bốn ràng buộc định hình lựa chọn (đã khảo sát code trước kh
 
 1. **Không có hạ tầng email.** Toàn repo không có SMTP/mailer/verify-token. Khuyến nghị nguyên văn của pentest ("luôn trả 202 + gửi email xác minh") **không khả thi trực tiếp** — nó là một tính năng lớn (email verification) chứ không phải một bản vá. Xây dựng nó nằm ngoài phạm vi slice này.
 
-2. **Frontend bỏ qua body của register.** `RegisterForm.tsx` (onSubmit, dòng 75-93) gọi `await registerAccount(...)` **không đọc body trả về**, rồi gọi `login()` riêng và định tuyến `/consent` vs `/dashboard` dựa trên `res.user.account_status` của **login response**. ⇒ Đổi shape/nội dung response của register **không phá frontend**.
+2. **Frontend bỏ qua *body* của register, nhưng phản ứng theo *status*.** `RegisterForm.tsx` (onSubmit) gọi `await registerAccount(...)` **không đọc body trả về**, rồi gọi `login()` riêng và định tuyến `/consent` vs `/dashboard` dựa trên `res.user.account_status` của **login response**. ⇒ Đổi *shape/nội dung* body của register **không phá frontend**. **Tuy nhiên** FE phản ứng theo *kết quả thành/bại* (HTTP status) của lời gọi register: trước H-04, 409 ném lỗi → `catch` hiển thị "Email đã được đăng ký" rồi dừng tại `/register`; sau H-04, 201 → chạy tiếp chuỗi auto-login. Vậy việc đổi **409 → 201** *có* đổi luồng UI của trường hợp email-trùng (xem §4.6) — không phải "không ảnh hưởng FE" như cách nói đơn giản hóa ban đầu.
 
 3. **Hợp đồng thành công (201 + `UserOut` có `id`) bị phụ thuộc rộng.** 32 chỗ đọc `["id"]` qua 27 lần gọi helper `_register` trong test suite assert `status_code == 201` rồi đọc `id`. ⇒ Đổi success path sang "202 + body rỗng" có blast radius lớn (sửa 27+ helper). Tránh.
 
@@ -96,6 +96,19 @@ Nhánh thật giữ `auth.register.succeeded` như cũ.
 ### 4.5 Trung lập với formal verification
 
 `register()` không phát `trace_emit` (chỉ login/refresh/logout liên quan CP-7 mới emit). Nhánh tổng hợp cũng không emit, không đụng token lifecycle ⇒ **trung lập** với 6 module TLA+ / Gate B. Không cần re-verify.
+
+### 4.6 Hệ quả lên luồng UI (chuỗi auto-login của RegisterForm)
+
+`RegisterForm.onSubmit` chạy `registerAccount()` rồi **luôn** chạy tiếp `login()` với cùng email/mật khẩu vừa nhập. Vì register giờ luôn trả 201 (không còn ném 409), luồng UI của trường hợp email-trùng đổi như sau — và **không** còn lộ "email đã tồn tại":
+
+| Mật khẩu nhập ở lần register-trùng | register | auto-login kế tiếp | Người dùng thấy |
+|---|---|---|---|
+| **Trùng** mật khẩu thật của tài khoản | 201 (no-op) | 200 — khớp | Vào `/dashboard`, **giống hệt** đăng ký email mới thành công |
+| **Khác** mật khẩu thật | 201 (no-op) | 401 — không khớp | "Email hoặc mật khẩu không đúng" (lỗi credential chung của login), ở lại `/register` |
+
+Điểm mấu chốt: ở **cả hai** nhánh, FE **không bao giờ** hiển thị thông điệp "Email đã được đăng ký" nữa — oracle email-tồn-tại ở tầng UI đã biến mất. Trường hợp "mật khẩu khác" rơi vào đúng **login-chain residual** đã ghi ở §5.1 (phân biệt được chỉ sau khi *thử chiếm* email bằng một chuỗi nhiều bước, bị bóp bởi rate-limit), không phải oracle một-request của register.
+
+Hệ quả kiểm thử: E2E `frontend/tests/e2e/auth-lifecycle.spec.ts` trước đây assert thông điệp 409 ("Email đã được đăng ký" + ở lại `/register`). Test này được viết lại để pin hành vi mới: đăng ký lại email tồn tại với **cùng mật khẩu** ⇒ vào `/dashboard` *không phân biệt được* với đăng ký mới, và thông điệp oracle **không** xuất hiện. Các bất biến tầng DB (no-op, không ghi đè mật khẩu, audit) vẫn do backend pytest pin (§6) — E2E chỉ phủ phần UI quan sát được.
 
 ---
 

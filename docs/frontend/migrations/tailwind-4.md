@@ -226,10 +226,41 @@ each is the same explained, deliberate font correction).
 - **Rollback** is a single-commit revert (config + globals.css + package.json/
   lock); no data or API surface touched.
 
+## Re-baselining Chromatic (one-time, branch-scoped)
+
+The 29 Times→Be-Vietnam-Pro diffs are the intended correction, so they must be
+accepted **once** to become the new baseline. The Chromatic **UI accept** path
+did not work here:
+
+- The gate is the GitHub Actions job `📚 Storybook + Chromatic`, not a
+  Chromatic check-run. Chromatic only posts a legacy `UI Tests` commit status,
+  which stayed `pending` across builds 48–51 — the manual accept never
+  registered server-side (most likely a Reviewer-vs-Viewer permission gap on
+  the Chromatic project).
+- Even when an accept registers, it flips the commit status but does **not**
+  re-run the Actions job; and a same-commit job re-run does not reliably
+  inherit a prior same-commit build's acceptance. So the UI path could not
+  unblock this PR.
+
+**Decision — programmatic re-baseline scoped to this branch.** Add
+`autoAcceptChanges: chore/fe-tailwind-4` to the `chromaui/action@v17` step.
+When the running branch matches, Chromatic auto-accepts all changes on that
+build, turning the gate green. The acceptance propagates to `main` through the
+merge commit's ancestry, so `main` stays green after merge (no diff on the next
+unrelated PR).
+
+This is a **one-time** re-baseline, not a policy change: `exitZeroOnChanges:
+false` is kept, so any *future* unaccepted drift on any other branch still
+fails. The scoped line is dead weight once merged and is removed in the
+following slice (#46 next 16) — tracked below.
+
 ## Out of scope (next slice)
 
 - **#46 next 16** — framework upgrade; largest blast radius; do last (shared
-  `package-lock.json`, so sequential after this merges).
+  `package-lock.json`, so sequential after this merges). **Fold in:** remove
+  the one-time `autoAcceptChanges: chore/fe-tailwind-4` line from the Chromatic
+  step (it is dead once this branch merges; main's baseline is now the brand
+  font).
 - Porting the JS `theme.extend` into CSS `@theme` (a v4 idiom) — deferred; the
   `@config` bridge keeps this slice minimal and drift-free. Tracked as possible
   future cleanup, not part of the upgrade.

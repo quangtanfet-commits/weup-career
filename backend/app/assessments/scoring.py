@@ -61,7 +61,7 @@ def _dimension_totals(answers: Mapping[str, object], dimensions: tuple[str, ...]
     An item key ``"<DIM>_<n>"`` contributes to dimension ``<DIM>``. Keys that
     do not map onto a known dimension are ignored (robust to noisy input).
     """
-    totals = {dim: 0 for dim in dimensions}
+    totals = dict.fromkeys(dimensions, 0)
     for key, raw in answers.items():
         if not isinstance(key, str) or "_" not in key:
             continue

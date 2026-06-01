@@ -68,9 +68,9 @@ def test_counterfactual_top5_invariant() -> None:
 
     assert total_pairs > 0
     ratio = identical_pairs / total_pairs
-    assert (
-        ratio >= 0.99
-    ), f"counterfactual top-5 identical ratio {ratio:.4f} < 0.99; skewed={skewed}"
+    assert ratio >= 0.99, (
+        f"counterfactual top-5 identical ratio {ratio:.4f} < 0.99; skewed={skewed}"
+    )
     # With an attribute-blind engine the ratio must in fact be a perfect 1.0.
     assert ratio == 1.0, f"unexpected counterfactual drift: {skewed}"
 

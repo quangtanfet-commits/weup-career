@@ -131,9 +131,7 @@ async def test_register_duplicate_audited_defender_side_pt04(
         suppressed = (
             (
                 await s.execute(
-                    select(AuditLog).where(
-                        AuditLog.action == "auth.register.duplicate_suppressed"
-                    )
+                    select(AuditLog).where(AuditLog.action == "auth.register.duplicate_suppressed")
                 )
             )
             .scalars()

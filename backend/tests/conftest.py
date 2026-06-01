@@ -23,6 +23,7 @@ def make_settings(**overrides: object) -> Settings:
         "field_encryption_key": "test-field-key-0123456789abcdef0123456789abcdef",
         "database_url": "sqlite+aiosqlite:///:memory:",
         "bcrypt_rounds": 4,  # fast hashing in tests
+        "rate_limit_enabled": False,  # opt-in per test; keeps the suite deterministic
     }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]

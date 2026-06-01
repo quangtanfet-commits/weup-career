@@ -72,6 +72,18 @@ class Settings(BaseSettings):
 
     cors_origins: str = ""
 
+    # Rate limiting (PT-03, ADR-008 §Rate Limiting). Defaults match the ADR
+    # bucket table; in-memory fixed-window — see docs/security/http-hardening.md.
+    rate_limit_enabled: bool = True
+    rate_limit_register_max: int = 5
+    rate_limit_register_window_seconds: int = 3600
+    rate_limit_login_max: int = 20
+    rate_limit_login_window_seconds: int = 60
+    rate_limit_refresh_max: int = 60
+    rate_limit_refresh_window_seconds: int = 60
+    rate_limit_api_max: int = 200
+    rate_limit_api_window_seconds: int = 60
+
     @field_validator("secret_key", "field_encryption_key", mode="before")
     @classmethod
     def _resolve_from_file(cls, value: str, info: object) -> str:

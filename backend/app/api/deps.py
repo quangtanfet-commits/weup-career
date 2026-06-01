@@ -282,15 +282,34 @@ async def _reject_if_revoked(claims: dict[str, Any], revoked: SqlRevokedTokenRep
         raise AuthenticationError()
 
 
+async def _reject_if_stale_session(claims: dict[str, Any], users: SqlUserRepo) -> None:
+    """Reject an access token whose session epoch is below the user's current one (H-02).
+
+    Re-login and password change bump ``User.session_version``; a token minted
+    before the bump carries an ``sv`` claim below the live value and is rejected,
+    invalidating *all* prior access tokens at once. A token with no ``sv`` claim
+    (legacy, pre-H-02) falls through unchanged so a deploy does not mass-401 live
+    sessions; a missing user (``None``) is left to the existing identity checks.
+    """
+    sv = claims.get("sv")
+    if sv is None:
+        return
+    current = await users.current_session_version(str(claims["sub"]))
+    if current is not None and int(sv) < current:
+        raise AuthenticationError()
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     settings: Settings = Depends(settings_dep),
     revoked: SqlRevokedTokenRepo = Depends(revoked_token_repo),
+    users: SqlUserRepo = Depends(user_repo),
 ) -> CurrentUser:
     if credentials is None or not credentials.credentials:
         raise AuthenticationError()
     claims = decode_access_token(credentials.credentials, settings=settings)
     await _reject_if_revoked(claims, revoked)
+    await _reject_if_stale_session(claims, users)
     return _user_from_claims(claims)
 
 
@@ -298,6 +317,7 @@ async def optional_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     settings: Settings = Depends(settings_dep),
     revoked: SqlRevokedTokenRepo = Depends(revoked_token_repo),
+    users: SqlUserRepo = Depends(user_repo),
 ) -> CurrentUser | None:
     """Resolve the Bearer identity if present; ``None`` for an anonymous caller.
 
@@ -317,6 +337,7 @@ async def optional_current_user(
         return None
     claims = decode_access_token(credentials.credentials, settings=settings)
     await _reject_if_revoked(claims, revoked)
+    await _reject_if_stale_session(claims, users)
     return _user_from_claims(claims)
 
 

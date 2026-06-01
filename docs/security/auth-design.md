@@ -42,6 +42,7 @@ Register/Login
   "iat": 1716800000,
   "exp": 1716800900,
   "jti": "tkn_01HX...",
+  "sv": 1,
   "iss": "weup-api"
 }
 ```
@@ -96,7 +97,32 @@ Client                                Server
 - **Bảng có giới hạn:** `add` idempotent (logout 2 lần an toàn) và prune cơ hội các dòng quá `expires_at`, giữ bảng bị chặn bởi TTL access 15' thay vì phình theo mỗi lần logout.
 - **Độc lập với formal verification:** H-01 là lớp bổ sung, không đụng vòng đời refresh CP-7 mà TLA+ Gate-B mô hình hóa — không thay đổi `trace_emit`.
 
-> Ngoài phạm vi (theo dõi là **H-02**): vô hiệu hóa **mọi** access token cũ của user khi đăng nhập lại / đổi mật khẩu (current-`jti` hoặc session-version). Phần plumbing `CurrentUser.jti` / `token_exp` thêm ở đây là nền tảng cho H-02.
+> Ngoài phạm vi của H-01 (xem **H-02** bên dưới): vô hiệu hóa **mọi** access token cũ của user khi đăng nhập lại / đổi mật khẩu.
+
+---
+
+## Session-version epoch — vô hiệu hóa hàng loạt access token (H-02)
+
+**Trạng thái:** Đã triển khai (2026-06-01). Dựa trên H-01; đóng lỗ hổng pentest PT-02 (xem lại 2026-08-31).
+
+H-01 chỉ thu hồi **một** token tại đúng lần logout của nó. H-02 vô hiệu hóa **mọi** access token cũ của user **cùng lúc** khi "session epoch" thay đổi — để một access token bị đánh cắp (dạng bare, không kèm refresh cookie) chết ngay khi chủ hợp pháp đăng nhập lại hoặc đổi mật khẩu, không phải chờ hết `exp` của từng token.
+
+```
+Client                                  Server
+  │── POST /auth/login ─────────────────►│ session_version += 1  (epoch mới)
+  │◄─ 200 {access_token: AT (sv=epoch)} ─│ AT đóng dấu sv = epoch hiện tại
+  │── GET /auth/me (Bearer AT cũ, sv thấp)►│ sv < session_version → 401
+```
+
+- **Cơ chế:** bộ đếm tăng đơn điệu theo user `user.session_version` (mặc định `1`, `server_default '1'`). Migration `c2d3e4f5a6b7`.
+- **Đóng dấu trên token:** mỗi access token mang epoch phát hành ở claim `sv` (`create_access_token`); refresh phát lại token ở epoch **hiện tại**.
+- **Tăng epoch khi:** (a) **mỗi lần đăng nhập thành công** — nên login mới sẽ "về hưu" các token từ lần login trước; (b) **đổi mật khẩu** (`POST /me/password`), kèm theo **thu hồi toàn bộ refresh-token family** → kill cứng trên mọi thiết bị.
+- **Kiểm tra khi xác thực:** `get_current_user` / `optional_current_user` từ chối token có `sv` **thấp hơn** `session_version` sống của user → **401** (`_reject_if_stale_session`).
+- **Fall-through (không 401 hàng loạt khi deploy):** **bỏ qua** kiểm tra khi claim `sv` vắng mặt (token cũ trước H-02) hoặc subject không còn tồn tại — giống cơ chế bỏ qua khi thiếu `jti` của H-01. Thiết bị hợp lệ tự khôi phục nhờ refresh cookie phát lại token ở epoch mới.
+- **Chi phí:** thêm một lần đọc một-cột (`session_version`) mỗi request đã xác thực; một lần tăng bộ đếm mỗi login / đổi mật khẩu. **Không** sinh dòng mới theo từng token (khác với denylist của H-01).
+- **Độc lập với formal verification:** như H-01, là lớp bổ sung — không đụng vòng đời refresh CP-7, không thay đổi `trace_emit`.
+
+> **Vì sao tăng epoch ở mỗi lần login (không chỉ khi đổi mật khẩu)?** Mối đe dọa H-02 nhắm tới là access token bare bị đánh cắp; gắn việc vô hiệu hóa vào ngay lần đăng nhập hợp lệ kế tiếp đóng cửa sổ tấn công mà không cần thao tác từ người dùng. Các phiên hợp lệ song song không bị ảnh hưởng vì chúng giữ refresh cookie và tự phát lại token ở epoch mới.
 
 ---
 

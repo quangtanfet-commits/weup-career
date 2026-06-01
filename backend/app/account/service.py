@@ -139,6 +139,10 @@ class AccountService:
             raise InvalidCredentialsError("Mật khẩu hiện tại không đúng")
 
         user.hashed_password = hash_password(new_password, rounds=self._settings.bcrypt_rounds)
+        # H-02: bump the session epoch so every prior access token is rejected
+        # immediately (the refresh-family revoke below is the paired hard kill —
+        # together they invalidate the access token AND prevent re-issuance).
+        user.session_version += 1
         await self._users.update(user)
         # Revoke all active refresh tokens: a password change invalidates
         # existing sessions (reuse of the existing family-revoke primitive).

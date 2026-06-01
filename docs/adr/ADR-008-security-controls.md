@@ -18,7 +18,7 @@ Use **JWT (access) + httpOnly cookie (refresh)** for authentication. Full OWASP 
 - Stored in Zustand memory (not localStorage — XSS-safe)
 - 15-minute expiry minimizes exposure window if intercepted
 - Signed with HS256 (HMAC-SHA256) using a 256-bit secret key
-- Claims: `sub` (user_id), `exp`, `iat`, `jti` (unique token ID; denylisted on logout — see H-01 below)
+- Claims: `sub` (user_id), `exp`, `iat`, `jti` (unique token ID; denylisted on logout — see H-01 below), `sv` (session-version epoch; tokens below the user's live epoch are rejected — see H-02 below)
 - Sent as `Authorization: Bearer {token}` header (not in URL, not in cookie)
 
 **Why HS256 and not RS256:**
@@ -54,7 +54,25 @@ Logout previously revoked only the opaque refresh token, leaving the access JWT 
 - **Bounded growth:** `add` is idempotent (double-logout safe) and opportunistically prunes rows past `expires_at`, so the table stays bounded by the 15-min access TTL rather than growing per logout.
 - **Orthogonal to formal verification:** H-01 is additive to the CP-7 refresh lifecycle the TLA+ Gate-B trace models — no `trace_emit` changes.
 
-Out of scope (tracked as **H-02**): invalidating *all prior* access tokens for a user on re-login / password change (current-`jti` or session-version). The `CurrentUser.jti` / `token_exp` plumbing added here is its foundation.
+Out of scope (tracked as **H-02**, below): invalidating *all prior* access tokens for a user on re-login / password change.
+
+---
+
+## H-02: Session-version epoch (mass access-token invalidation)
+
+**Status:** Implemented (2026-06-01). Builds on H-01; tracks pentest finding PT-02 (revisit 2026-08-31).
+
+H-01 kills a single token on its own logout. H-02 invalidates **every** prior access token for a user at once when their session epoch changes — needed so a stolen bare access token dies the moment the legitimate owner re-authenticates or rotates their password, without waiting on the per-token `exp`.
+
+- **Mechanism:** a monotonic per-user counter `user.session_version` (default `1`, `server_default '1'`). Migration `c2d3e4f5a6b7`.
+- **Stamped on the token:** every access token carries the issuing epoch as the `sv` claim (`create_access_token`); refresh re-issues at the *current* epoch.
+- **Bumped on:** (a) **every successful login** — so a fresh login retires tokens from earlier logins; (b) **password change** (`POST /me/password`), which *also* revokes the refresh-token family, making it a hard kill across all devices.
+- **At validation:** `get_current_user` / `optional_current_user` reject a token whose `sv` is **below** the user's live `session_version` → `401` (`_reject_if_stale_session`).
+- **Fall-through (no mass-401 on deploy):** the check is **skipped** when the `sv` claim is absent (legacy pre-H-02 tokens) or the subject no longer exists — mirroring H-01's no-`jti` fall-through. Legit devices recover transparently via their refresh cookie, which re-issues at the new epoch.
+- **Cost:** one extra single-column read (`session_version`) per authenticated request; one counter increment per login / password change. No new per-token rows (contrast H-01's denylist).
+- **Orthogonal to formal verification:** like H-01, additive to the CP-7 refresh lifecycle — no `trace_emit` changes.
+
+**Why bump on every login (not only on password change)?** A bare stolen access token (no refresh cookie) is the threat H-02 targets; tying invalidation to the very next legitimate login closes the window without any user-visible action. Legitimate concurrent sessions are not harmed because each holds a refresh cookie and silently re-issues at the new epoch.
 
 ---
 
@@ -102,3 +120,4 @@ Out of scope (tracked as **H-02**): invalidating *all prior* access tokens for a
 - JWT secret rotation requires re-login of all users (acceptable; documented in runbook)
 - Double-use of refresh token triggers account security alert (future: email notification)
 - H-01 adds one DB write per logout and one indexed `jti` lookup per authenticated request; the `revoked_access_token` table self-prunes to stay bounded by the 15-min access TTL
+- H-02 adds one single-column `session_version` read per authenticated request and one counter bump per login / password change; no per-token rows. A login from a new device retires the user's other bare access tokens, but sessions holding a refresh cookie re-issue transparently at the new epoch

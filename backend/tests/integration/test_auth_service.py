@@ -23,7 +23,7 @@ from app.core.config import Settings
 from app.core.enums import AccountStatus, AgeBand, UserType
 from app.core.exceptions import TokenError
 from app.core.models import new_uuid, utcnow
-from app.core.security import hash_refresh_token
+from app.core.security import decode_access_token, hash_refresh_token
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -291,3 +291,83 @@ async def test_logout_idempotent_on_same_jti(session: AsyncSession, settings: Se
         .where(RevokedAccessToken.jti == "jti-twice")
     )
     assert count == 1
+
+
+# -- H-02 session-version epoch ---------------------------------------------
+
+
+async def test_user_repo_current_session_version(session: AsyncSession, settings: Settings) -> None:
+    """Light single-column read: 1 for a fresh user, follows bumps, None when absent."""
+    repo = SqlUserRepo(session)
+    user = await _make_user(session)
+    assert await repo.current_session_version(user.id) == 1
+    user.session_version += 1
+    await session.flush()
+    assert await repo.current_session_version(user.id) == 2
+    assert await repo.current_session_version("nonexistent-user-id") is None
+
+
+async def test_login_bumps_session_version_and_stamps_token(
+    session: AsyncSession, settings: Settings
+) -> None:
+    """Every successful login increments the epoch and stamps it on the ``sv``
+    claim, so a token minted by an earlier login is now below the live value."""
+    svc = _service(session, settings)
+    await svc.register(
+        RegisterRequest(
+            email="sv@example.com",
+            password="Password123",
+            date_of_birth=datetime(2000, 1, 1).date(),
+            user_type=UserType.STUDENT,
+        )
+    )
+    first = await svc.login(LoginRequest(email="sv@example.com", password="Password123"))
+    second = await svc.login(LoginRequest(email="sv@example.com", password="Password123"))
+
+    sv_first = decode_access_token(first.access_token, settings=settings)["sv"]
+    sv_second = decode_access_token(second.access_token, settings=settings)["sv"]
+    assert sv_second == sv_first + 1
+    # The live epoch matches the most recent login's token.
+    repo = SqlUserRepo(session)
+    assert await repo.current_session_version(second.user.id) == sv_second
+
+
+async def test_stale_session_guard_skips_when_sv_claim_absent(
+    session: AsyncSession, settings: Settings
+) -> None:
+    """Legacy tokens minted before H-02 carry no ``sv`` claim — the guard must
+    fall through (no raise) so a deploy does not mass-401 live sessions."""
+    from app.api.deps import _reject_if_stale_session
+
+    repo = SqlUserRepo(session)
+    # No ``sv`` key at all → skip, even though the subject does not exist.
+    await _reject_if_stale_session({"sub": "whoever"}, repo)
+
+
+async def test_stale_session_guard_skips_when_user_absent(
+    session: AsyncSession, settings: Settings
+) -> None:
+    """A token whose subject no longer exists is left to other guards (the user
+    lookup will 401 downstream); the epoch check itself does not raise."""
+    from app.api.deps import _reject_if_stale_session
+
+    repo = SqlUserRepo(session)
+    await _reject_if_stale_session({"sub": "nonexistent-user-id", "sv": 5}, repo)
+
+
+async def test_stale_session_guard_raises_on_below_epoch_token(
+    session: AsyncSession, settings: Settings
+) -> None:
+    """A token stamped with an ``sv`` below the user's live epoch is rejected."""
+    from app.api.deps import _reject_if_stale_session
+    from app.core.exceptions import AuthenticationError
+
+    repo = SqlUserRepo(session)
+    user = await _make_user(session)
+    user.session_version = 3
+    await session.flush()
+    # A token minted at epoch 2 is now below the live epoch 3 → reject.
+    with pytest.raises(AuthenticationError):
+        await _reject_if_stale_session({"sub": user.id, "sv": 2}, repo)
+    # A token at the live epoch is accepted.
+    await _reject_if_stale_session({"sub": user.id, "sv": 3}, repo)

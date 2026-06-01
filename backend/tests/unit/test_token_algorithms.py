@@ -40,6 +40,7 @@ def _token(**kw: object) -> str:
         "age_band": "under_16",
         "account_status": "active",
         "roles": ["student"],
+        "session_version": 1,
     }
     base.update(kw)
     return create_access_token(**base)  # type: ignore[arg-type]

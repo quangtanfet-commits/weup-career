@@ -263,6 +263,71 @@ async def test_denylisted_token_rejected_on_public_read_h01(client: AsyncClient)
     assert resp.status_code == 401
 
 
+# -- H-02 session-version epoch (re-login / password change) ----------------
+
+
+async def _login(client: AsyncClient, email: str = "adult@example.com") -> str:
+    resp = await client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": "Password123"},
+    )
+    return resp.json()["access_token"]
+
+
+async def test_relogin_invalidates_prior_access_token_h02(client: AsyncClient) -> None:
+    """H-02: a second login bumps the user's session epoch, so the bare access
+    token minted by the first login is below the live ``sv`` and now rejected —
+    even though it is cryptographically valid until its 15-min exp."""
+    token_a = await _register_login(client)
+    auth_a = {"Authorization": f"Bearer {token_a}"}
+    assert (await client.get("/api/v1/auth/me", headers=auth_a)).status_code == 200
+    # Re-login → new epoch + new token.
+    token_b = await _login(client)
+    assert token_b != token_a
+    # The old token is now stale (sv below current).
+    assert (await client.get("/api/v1/auth/me", headers=auth_a)).status_code == 401
+    # The fresh token works.
+    assert (
+        await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token_b}"})
+    ).status_code == 200
+
+
+async def test_password_change_invalidates_prior_access_token_h02(client: AsyncClient) -> None:
+    """Changing the password bumps the epoch, killing every prior access token."""
+    token = await _register_login(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    assert (await client.get("/api/v1/auth/me", headers=auth)).status_code == 200
+    resp = await client.post(
+        "/api/v1/me/password",
+        headers=auth,
+        json={"current_password": "Password123", "new_password": "NewPassword456"},
+    )
+    assert resp.status_code == 204
+    # The token that authorised the change is itself now stale.
+    assert (await client.get("/api/v1/auth/me", headers=auth)).status_code == 401
+
+
+async def test_relogin_does_not_affect_other_users_h02(client: AsyncClient) -> None:
+    """One user's re-login bumps only their own epoch — isolation across users."""
+    token_a = await _register_login(client)
+    client.cookies.clear()
+    await client.post("/api/v1/auth/register", json=register_payload(email="other@example.com"))
+    token_b = await _login(client, email="other@example.com")
+    # A re-logs in (bumps A's epoch only).
+    await client.post(
+        "/api/v1/auth/login",
+        json={"email": "adult@example.com", "password": "Password123"},
+    )
+    # A's first token is stale…
+    assert (
+        await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token_a}"})
+    ).status_code == 401
+    # …but B's token is untouched.
+    assert (
+        await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token_b}"})
+    ).status_code == 200
+
+
 async def test_correlation_id_echoed(client: AsyncClient) -> None:
     resp = await client.get("/api/v1/health", headers={"X-Request-ID": "req_custom_123"})
     assert resp.headers["X-Request-ID"] == "req_custom_123"

@@ -30,8 +30,12 @@
   --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.1);
   --shadow-lg: 0 12px 32px -8px rgb(15 23 42 / 0.18);
 
-  /* Typography token (font supplied via next/font as --font-sans) */
-  --font-sans: var(--font-be-vietnam-pro), Inter, system-ui, sans-serif;
+  /* Typography token (Be Vietnam Pro supplied via next/font as
+   * --font-be-vietnam-pro). Inner fallback `ui-sans-serif` keeps the stack
+   * valid if the var is ever absent — without it the value collapses to an
+   * invalid leading comma and text falls back to the UA serif. */
+  --font-sans:
+    var(--font-be-vietnam-pro, ui-sans-serif), Inter, system-ui, sans-serif;
 
   /* shadcn/ui structural tokens (HSL channels) */
   --border: 214 32% 91%;

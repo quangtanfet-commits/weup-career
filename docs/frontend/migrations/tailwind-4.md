@@ -154,6 +154,67 @@ All locally-runnable gates green:
 **Chromatic is CI-only** (needs `CHROMATIC_PROJECT_TOKEN`) — adjudicated on the
 PR, not locally.
 
+### Chromatic adjudication finding (2026-06-01): every text story flips font
+
+The first Chromatic run on PR #53 flagged **29 diffs across all 6 components**
+(Button/Card/Input/Label/Select/Textarea) — far beyond the bounded preflight
+deltas above. Empirical A/B (`scripts/sb-capture.mjs`, computed-style dump +
+screenshots of a v4 static build vs. a v3 build from parent `9f01539`) pinned
+the mechanism — it is **not** a Tailwind-utility regression but a **pre-existing
+Storybook font-fidelity bug** that the v4 engine merely re-skinned:
+
+| element | v3 baseline `font-family` | v4 `font-family` |
+|---|---|---|
+| label / card / button / input | **`"Times New Roman"`** (UA serif) | `ui-sans-serif, system-ui, …` |
+
+Chain of causation:
+
+1. `globals.css` defines `--font-sans: var(--font-be-vietnam-pro), Inter,
+   system-ui, sans-serif` and `body { font-family: var(--font-sans) }`.
+   `--font-be-vietnam-pro` is injected **only** by `next/font` in
+   `app/layout.tsx` (`<html className={beVietnamPro.variable}>`).
+2. **Storybook never wired `next/font`** (`.storybook/preview.tsx` imports
+   `globals.css` only). So `--font-be-vietnam-pro` is undefined and
+   `var(--font-be-vietnam-pro)` — *no inner fallback* — collapses to nothing,
+   making `--font-sans` evaluate to a **leading-comma** string
+   (`, Inter, system-ui, sans-serif`) → an **invalid** `font-family` → the
+   `body` rule is dropped and text inherits the `html` preflight font.
+3. **v3** `html` preflight font was `theme('fontFamily.sans')` →
+   `var(--font-sans)` → *also* invalid (same leading comma) → cascaded to the
+   browser UA default = **Times New Roman**. So the v3 Chromatic baselines were
+   silently banking serif text for every story.
+4. **v4** `html` preflight font is a hardcoded, *valid* sans fallback
+   (`--theme(--default-font-family, ui-sans-serif, system-ui, sans-serif, …)`);
+   `@config`'s `fontFamily.sans` feeds the `.font-sans` *utility*, **not** the
+   `--default-font-family` var the `html` rule reads. So v4 text falls to
+   `ui-sans-serif` — which is why all text flipped serif→sans at once.
+
+**Neither font is the brand font.** The v3 baseline is the bug; matching it
+would mean re-banking Times New Roman. The correct resolution is to make
+Storybook render the **real** production font so the baselines are meaningful.
+
+**Fix (two parts):**
+
+1. **Storybook font fidelity** — `.storybook/preview.tsx`: instantiate
+   `Be_Vietnam_Pro` from `next/font/google` identically to `app/layout.tsx` and
+   apply its `.variable` class to `document.documentElement`, mirroring
+   production's `<html className={beVietnamPro.variable}>`. `@storybook/
+   nextjs-vite` (via `vite-plugin-storybook-nextjs`) fetches + **self-hosts**
+   Google fonts at build time, so this is deterministic at render (no runtime
+   network) and Chromatic-safe.
+2. **Production robustness** — `globals.css`: give the var an inner fallback,
+   `--font-sans: var(--font-be-vietnam-pro, ui-sans-serif), Inter, system-ui,
+   sans-serif`, so the token can **never** evaluate to an invalid leading-comma
+   value even if `next/font` injection is ever absent (defence-in-depth; the
+   real bug that made Storybook fall to Times). Production rendering is
+   unchanged (the var is defined, so `'Be Vietnam Pro', …` resolves first).
+
+After the fix, Storybook stories render **Be Vietnam Pro** (the production
+font). The Chromatic diffs vs. the v3 baseline therefore remain — they are the
+intended Times→brand-font **correction**, uniform across every text story, and
+are adjudicated/accepted as the new correct baselines (not blanket-accepted:
+each is the same explained, deliberate font correction).
+
 ## Risks & rollback
 
 - **Highest risk = Chromatic baseline drift.** Bounded by the audit above (no

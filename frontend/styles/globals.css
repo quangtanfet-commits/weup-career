@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.ts";
 
 /**
  * Design tokens — single source of truth (architecture.md §2.4).
@@ -42,6 +41,13 @@
 
 * {
   border-color: hsl(var(--border));
+}
+
+/* Tailwind v4 preflight sets buttons to cursor:default; restore the v3
+ * pointer affordance our components/baselines were built against. */
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
 }
 
 body {

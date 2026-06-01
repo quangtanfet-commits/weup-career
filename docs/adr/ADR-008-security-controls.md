@@ -84,7 +84,7 @@ H-01 kills a single token on its own logout. H-02 invalidates **every** prior ac
 | A02 Cryptographic Failures | bcrypt cost≥12; JWT HS256; HTTPS; **mã hóa trường nhạy cảm — kết quả trắc nghiệm (Field Crypto, `FIELD_ENCRYPTION_KEY`)**; không PII trong log |
 | A03 Injection | Pydantic validation (no raw string interpolation); SQLAlchemy ORM (parameterized queries only); CSP headers |
 | A04 Insecure Design | Threat model produced; **DPIA + phân loại rủi ro AI (Luật 134/2025)**; **human-in-the-loop & rationale cho gợi ý (CP-5/CP-6)**; security review trước release |
-| A05 Security Misconfiguration | No DEBUG mode in production; security headers in Nginx; no exposed admin endpoints |
+| A05 Security Misconfiguration | No DEBUG mode in production; **security headers at the app layer (H-03 — nosniff, X-Frame-Options DENY, Referrer-Policy, strict CSP, HSTS prod-only, Server masked)**; no exposed admin endpoints |
 | A06 Vulnerable Components | `trivy` + `pip-audit` + `npm audit` in CI; dependabot alerts enabled |
 | A07 Auth Failures | Rate limiting on /auth/*; generic error messages (no email enumeration); bcrypt timing safety |
 | A08 Software Integrity | Signed Docker images; locked dependencies (`uv.lock`, `package-lock.json`) |
@@ -103,6 +103,32 @@ H-01 kills a single token on its own logout. H-02 invalidates **every** prior ac
 
 ---
 
+## H-03: HTTP hardening — security headers + rate limiting
+
+**Status:** Implemented (2026-06-01). Closes pentest findings PT-03 (no rate
+limiting), PT-05 (missing security headers), PT-07 (`Server` header
+disclosure). Design: `docs/security/http-hardening.md`.
+
+Both controls live at the **application layer** (Starlette middleware), not in
+Nginx — so they hold when the API runs natively (devcontainer aarch64/linuxkit
+cannot run the docker-compose nginx stack) and equally when fronted by a proxy.
+This corrects the prior ADR wording that placed security headers "in Nginx".
+
+- **Security headers** (`security_headers_middleware`, outermost): stamped on
+  *every* response incl. errors/429 — `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, a strict
+  `Content-Security-Policy` (`default-src 'none'`) exempting only the three doc
+  paths (`/api/v1/docs`, `/api/v1/redoc`, `/api/v1/openapi.json`),
+  `Strict-Transport-Security` **production-only**, and `Server: WeUp` (masks the
+  uvicorn version, PT-07).
+- **Rate limiting** (`rate_limit_middleware`): dependency-free fixed-window
+  in-memory counter on `app.state`, gated by `rate_limit_enabled` (default on;
+  off in tests). Per-process counts — see the http-hardening doc for the
+  multi-worker limitation. Returns `429` + `Retry-After` + the standard error
+  envelope (`code: RATE_LIMITED`).
+- **Orthogonal to formal verification:** middleware-only, no `trace_emit`
+  changes — the CP-7 refresh lifecycle Gate-B trace is untouched.
+
 ## Rate Limiting
 
 | Endpoint group | Limit | Window | By |
@@ -110,7 +136,7 @@ H-01 kills a single token on its own logout. H-02 invalidates **every** prior ac
 | POST /auth/register | 5 | 60 min | IP |
 | POST /auth/login | 20 | 1 min | IP |
 | POST /auth/refresh | 60 | 1 min | IP |
-| All other /api/v1/* | 200 | 1 min | User ID |
+| All other /api/v1/* | 200 | 1 min | JWT `sub` if present, else IP |
 
 ---
 
@@ -121,3 +147,4 @@ H-01 kills a single token on its own logout. H-02 invalidates **every** prior ac
 - Double-use of refresh token triggers account security alert (future: email notification)
 - H-01 adds one DB write per logout and one indexed `jti` lookup per authenticated request; the `revoked_access_token` table self-prunes to stay bounded by the 15-min access TTL
 - H-02 adds one single-column `session_version` read per authenticated request and one counter bump per login / password change; no per-token rows. A login from a new device retires the user's other bare access tokens, but sessions holding a refresh cookie re-issue transparently at the new epoch
+- H-03 adds two `BaseHTTPMiddleware` layers: security headers (O(1) header writes per response) and an in-memory fixed-window rate limiter (one dict lookup + counter update per `/api/v1/*` request). The limiter is per-process, so horizontal scaling needs a shared store (Redis) to enforce a global limit — tracked as future work in `docs/security/http-hardening.md`

@@ -19,7 +19,11 @@ from app.core.config import Settings, get_settings
 from app.core.database import Database
 from app.core.exceptions import AppError, ValidationError
 from app.core.logging import configure_logging, get_logger
-from app.core.middleware import correlation_id_middleware
+from app.core.middleware import (
+    correlation_id_middleware,
+    make_security_headers_middleware,
+)
+from app.core.ratelimit import RateLimiter, make_rate_limit_middleware
 from app.core.schemas import ErrorEnvelope
 
 # Common error responses advertised on (almost) every operation so the generated
@@ -86,6 +90,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.state.settings = settings
+    app.state.rate_limiter = RateLimiter()
+    # Starlette applies middleware in REVERSE order of registration (last added
+    # = outermost). Registration order below yields the request-path chain:
+    #   security_headers → CORS → correlation_id → rate_limit → router
+    # so request_id is set before rate_limit builds a 429 envelope, and the
+    # security headers land on every response (incl. 429s and errors).
+    if settings.rate_limit_enabled:
+        app.add_middleware(BaseHTTPMiddleware, dispatch=make_rate_limit_middleware(settings))
     app.add_middleware(BaseHTTPMiddleware, dispatch=correlation_id_middleware)
     if settings.cors_origin_list:
         app.add_middleware(
@@ -95,6 +107,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+    app.add_middleware(
+        BaseHTTPMiddleware,
+        dispatch=make_security_headers_middleware(is_production=settings.is_production),
+    )
 
     @app.exception_handler(AppError)
     async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:

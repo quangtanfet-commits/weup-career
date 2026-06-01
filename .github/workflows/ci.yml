@@ -44,6 +44,25 @@ jobs:
             echo "has_e2e_stack=false" >> "$GITHUB_OUTPUT"
           fi
 
+  # ── 0b. Dependency Review (PR-only) ─────────────────────────
+  # Blocks PRs that introduce a dependency with a known high-severity
+  # vulnerability. The action diffs the PR base…head dependency manifests, so
+  # it only runs on pull_request events (it errors on push/schedule with no
+  # base/head). Moved here from the weekly security-scan workflow, where it
+  # could never succeed. Continuous dependency alerting stays on Dependabot.
+  dependency-review:
+    name: "📦 Dependency Review"
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
   # ── 1. Backend — Lint & Type Check ──────────────────────────
   lint-backend:
     name: "🔍 Backend Lint & Types"

@@ -134,6 +134,12 @@ class AuthService:
             )
             raise InvalidCredentialsError()
 
+        # H-02: bump the session epoch on every successful login so any
+        # previously leaked *bare* access token (sv now stale) is rejected.
+        # Legitimate devices are unaffected — their refresh cookie re-issues an
+        # access token at the new epoch on the next refresh.
+        user.session_version += 1
+        await self._users.update(user)
         tokens = await self._issue_session(user, user_agent=user_agent, ip_address=ip_address)
         await self._audit.record(
             action="auth.login.succeeded", actor_id=user.id, target_type="User"
@@ -264,6 +270,7 @@ class AuthService:
             age_band=user.age_band.value,
             account_status=user.account_status.value,
             roles=_roles_for(user),
+            session_version=user.session_version,
             now=issued,
         )
         raw_refresh = generate_refresh_token()

@@ -20,6 +20,7 @@ class IUserRepo(Protocol):
     async def get_by_id(self, user_id: str) -> User | None: ...
     async def get_by_email(self, email: str) -> User | None: ...
     async def update(self, user: User) -> User: ...
+    async def current_session_version(self, user_id: str) -> int | None: ...
 
 
 class IRefreshTokenRepo(Protocol):
@@ -53,6 +54,12 @@ class SqlUserRepo:
     async def update(self, user: User) -> User:
         await self._session.flush()
         return user
+
+    async def current_session_version(self, user_id: str) -> int | None:
+        # H-02: light single-column read for the per-request token-epoch check.
+        # ``None`` when the user does not exist (caller treats absence as "skip").
+        result = await self._session.execute(select(User.session_version).where(User.id == user_id))
+        return result.scalar_one_or_none()
 
 
 class SqlRefreshTokenRepo:

@@ -50,6 +50,7 @@ def create_access_token(
     age_band: str,
     account_status: str,
     roles: list[str],
+    session_version: int,
     jti: str | None = None,
     now: datetime | None = None,
 ) -> str:
@@ -63,6 +64,9 @@ def create_access_token(
         "age_band": age_band,
         "account_status": account_status,
         "roles": roles,
+        # Session epoch (H-02): rejected at validation if below the user's
+        # current value (re-login / password change bump it).
+        "sv": session_version,
         "iat": int(issued.timestamp()),
         "exp": int(expire.timestamp()),
         "jti": jti or secrets.token_urlsafe(16),

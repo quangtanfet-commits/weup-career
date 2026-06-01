@@ -11,6 +11,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     String,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -42,6 +43,13 @@ class User(UUIDMixin, TimestampMixin, Base):
     # library system-wide. Minimal, auditable flag (default off) rather than a
     # separate global-role table — only an operator/seed grants it.
     is_content_editor: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Session epoch (H-02). Every access token embeds this as the ``sv`` claim;
+    # a token whose ``sv`` is below the user's current value is rejected at
+    # validation time. Bumped on re-login (kills bare stolen access tokens) and
+    # on password change (hard session kill, paired with refresh-family revoke).
+    session_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
 
 
 class RefreshToken(UUIDMixin, Base):

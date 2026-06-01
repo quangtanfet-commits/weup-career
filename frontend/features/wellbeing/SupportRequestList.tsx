@@ -47,6 +47,11 @@ export function SupportRequestList({
   }, [t]);
 
   useEffect(() => {
+    // Client fetch-on-mount/refresh: `load` resets error state synchronously
+    // then setState after an awaited fetch. This is the data-load pattern that
+    // react-query (already a dep) would replace; migrating these feature reads
+    // is tracked separately, out of scope for the Next 16 bump.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load, refreshKey]);
 

@@ -234,13 +234,6 @@ jobs:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           storybookBuildDir: storybook-static
           exitZeroOnChanges: false # unapproved visual drift fails the PR
-          # One-time, branch-scoped re-baseline for the tailwind-4 Times→brand-font
-          # correction (29 deliberate diffs). The Chromatic UI accept never
-          # registered (UI Tests status stuck pending, builds 48–51); auto-accept
-          # on THIS branch only re-baselines them. exitZeroOnChanges stays false so
-          # other branches still fail on unaccepted drift. REMOVE in slice #46.
-          # See docs/frontend/migrations/tailwind-4.md § Re-baselining Chromatic.
-          autoAcceptChanges: chore/fe-tailwind-4
 
   # ── 5. Security Scan ─────────────────────────────────────────
   security:

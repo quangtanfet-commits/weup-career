@@ -65,6 +65,10 @@ export function RegisterForm() {
     },
   });
 
+  // react-hook-form's `watch()` returns a non-memoizable function, so React
+  // Compiler skips memoizing this component — inherent to the library, not a
+  // defect. See docs/frontend/migrations/next-16.md § React Compiler rules.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const dob = watch("date_of_birth");
   const showGuardianNotice = dob ? requiresGuardian(dob) : false;
 

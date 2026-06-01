@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import pytest
+from app.core.audit_models import AuditLog
+from app.core.database import Database
 from httpx import AsyncClient
+from sqlalchemy import select
 
 from tests.conftest import child_dob, register_payload
 
@@ -39,11 +42,104 @@ async def test_register_under16_pending_consent_cp1(client: AsyncClient) -> None
     assert body["account_status"] == "pending_guardian_consent"
 
 
-async def test_register_duplicate_email_409(client: AsyncClient) -> None:
+async def test_register_duplicate_email_indistinguishable_pt04(client: AsyncClient) -> None:
+    """PT-04: a duplicate email must not be a user-enumeration oracle.
+
+    The second registration of the same email returns a 201 + UserOut that is
+    indistinguishable from a fresh registration of that payload: same shape,
+    same derived fields, but a freshly-random id (never the existing user's).
+    """
+    first = await client.post("/api/v1/auth/register", json=register_payload())
+    assert first.status_code == 201
+    first_body = first.json()
+
+    second = await client.post("/api/v1/auth/register", json=register_payload())
+    assert second.status_code == 201
+    second_body = second.json()
+
+    # Identical response shape — no field leaks "already exists".
+    assert set(first_body.keys()) == set(second_body.keys())
+    assert "hashed_password" not in second_body
+    # Derived/echoed fields match the submitted payload on both responses.
+    assert second_body["email"] == first_body["email"] == "adult@example.com"
+    assert second_body["account_status"] == first_body["account_status"] == "active"
+    assert second_body["age_band"] == first_body["age_band"] == "adult"
+    # The synthesized id must be a fresh value, never the real user's id.
+    assert second_body["id"] != first_body["id"]
+
+
+async def test_register_duplicate_under16_indistinguishable_pt04(client: AsyncClient) -> None:
+    """The synthesized duplicate path derives consent status from the payload,
+    so a duplicate under-16 email still looks like a real under-16 signup."""
+    payload = register_payload(
+        email="kid@example.com", dob=child_dob(12), school_level="lower_secondary"
+    )
+    first = await client.post("/api/v1/auth/register", json=payload)
+    assert first.status_code == 201
+    second = await client.post("/api/v1/auth/register", json=payload)
+    assert second.status_code == 201
+    body = second.json()
+    assert body["age_band"] == "under_16"
+    assert body["account_status"] == "pending_guardian_consent"
+    assert body["id"] != first.json()["id"]
+
+
+async def test_register_duplicate_is_db_noop_pt04(client: AsyncClient) -> None:
+    """The duplicate path must not persist or mutate the existing account: the
+    second password is never stored, so the original password still logs in and
+    the second does not."""
+    await client.post(
+        "/api/v1/auth/register",
+        json=register_payload(password="Password123"),
+    )
+    # Re-register the same email with a *different* password.
+    resp = await client.post(
+        "/api/v1/auth/register",
+        json=register_payload(password="Secondpw789"),
+    )
+    assert resp.status_code == 201
+
+    # Original password still authenticates → the account was untouched.
+    ok = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "adult@example.com", "password": "Password123"},
+    )
+    assert ok.status_code == 200
+
+    # The duplicate-registration password was never stored.
+    bad = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "adult@example.com", "password": "Secondpw789"},
+    )
+    assert bad.status_code == 401
+
+
+async def test_register_duplicate_audited_defender_side_pt04(
+    client: AsyncClient, db: Database
+) -> None:
+    """The duplicate path is invisible to the attacker but recorded for the
+    defender: it logs ``duplicate_suppressed`` (not a second ``succeeded``)."""
     await client.post("/api/v1/auth/register", json=register_payload())
-    resp = await client.post("/api/v1/auth/register", json=register_payload())
-    assert resp.status_code == 409
-    assert resp.json()["error"]["code"] == "CONFLICT"
+    await client.post("/api/v1/auth/register", json=register_payload())
+
+    async with db.session_factory() as s:
+        succeeded = (
+            (await s.execute(select(AuditLog).where(AuditLog.action == "auth.register.succeeded")))
+            .scalars()
+            .all()
+        )
+        suppressed = (
+            (
+                await s.execute(
+                    select(AuditLog).where(AuditLog.action == "auth.register.duplicate_suppressed")
+                )
+            )
+            .scalars()
+            .all()
+        )
+    # Exactly one real signup, exactly one suppressed duplicate.
+    assert len(succeeded) == 1
+    assert len(suppressed) == 1
 
 
 async def test_register_email_normalized(client: AsyncClient) -> None:

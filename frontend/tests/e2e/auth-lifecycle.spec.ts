@@ -96,13 +96,21 @@ test.describe("login (CP-7)", () => {
   });
 });
 
-test.describe("registration errors", () => {
-  test("a duplicate email is rejected with an error and stays on /register", async ({
+test.describe("registration edge cases", () => {
+  test("re-registering an existing email is indistinguishable from a fresh signup (H-04: no email-exists oracle)", async ({
     page,
     browser,
   }) => {
+    // Create the account once (adult → dashboard).
     const creds = await registerAdult(page);
 
+    // Re-submit register with the SAME email + password from a clean context.
+    // Post-H-04 the backend answers 201 (synthesized, no-op) instead of 409, so
+    // RegisterForm no longer throws/surfaces an "email already registered"
+    // oracle; the auto-login chain then signs in with the matching password and
+    // lands on the dashboard — the same UX as registering a brand-new email.
+    // (See docs/security/email-enumeration.md §4.6. DB-level no-op / no
+    // password-overwrite / audit invariants are pinned by backend pytest.)
     const ctx = await browser.newContext();
     const fresh = await ctx.newPage();
     await fillRegisterForm(fresh, {
@@ -114,10 +122,11 @@ test.describe("registration errors", () => {
     });
     await fresh.getByRole("button", { name: "Đăng ký", exact: true }).click();
 
-    // Specific duplicate-email message; see the wrong-password test above for why
-    // a bare role=alert is avoided (WebKit route-announcer collision).
-    await expect(fresh.getByText("Email đã được đăng ký")).toBeVisible();
-    await expect(fresh).toHaveURL(/\/register$/);
+    // The register→login chain is two proxied round-trips; allow the same budget
+    // registerAdult uses for the redirect on the slower aarch64 CI engines.
+    await expect(fresh).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
+    // The removed oracle must NOT reappear at the UI.
+    await expect(fresh.getByText("Email đã được đăng ký")).toHaveCount(0);
     await ctx.close();
   });
 

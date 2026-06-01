@@ -60,7 +60,7 @@ async def test_generate_persists_proposed_with_audit(
     session: AsyncSession, seeded_careers: dict[str, int]
 ) -> None:
     """FR-63 + CP-5: generate writes a proposed reco and an audit row."""
-    svc, audit, _ = _service(session)
+    svc, _audit, _ = _service(session)
     uid = await _make_user(session)
 
     reco = await svc.generate(user_id=uid)

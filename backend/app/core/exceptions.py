@@ -63,8 +63,7 @@ class GuardianConsentRequiredError(AppError):
     status_code = 403
     code = "GUARDIAN_CONSENT_REQUIRED"
     message = (
-        "Tài khoản dưới 16 tuổi cần đồng ý của người giám hộ "
-        "trước khi xử lý dữ liệu hướng nghiệp"
+        "Tài khoản dưới 16 tuổi cần đồng ý của người giám hộ trước khi xử lý dữ liệu hướng nghiệp"
     )
 
 
@@ -106,6 +105,5 @@ class AssuranceTooLowError(AppError):
     status_code = 403
     code = "ASSURANCE_LEVEL_TOO_LOW"
     message = (
-        "Mức xác thực người giám hộ chưa đủ để xử lý dữ liệu nhạy cảm "
-        "của người dùng dưới 16 tuổi"
+        "Mức xác thực người giám hộ chưa đủ để xử lý dữ liệu nhạy cảm của người dùng dưới 16 tuổi"
     )

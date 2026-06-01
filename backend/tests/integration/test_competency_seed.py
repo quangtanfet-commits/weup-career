@@ -37,7 +37,7 @@ async def test_seed_codes_and_areas(db: Database) -> None:
     codes = {r.code for r in rows}
     assert codes == {f"NL{i}" for i in range(1, 13)}
     # Four competencies per area (A/B/C).
-    by_area: dict[CompetencyArea, int] = {a: 0 for a in CompetencyArea}
+    by_area: dict[CompetencyArea, int] = dict.fromkeys(CompetencyArea, 0)
     for r in rows:
         by_area[r.area] += 1
     assert by_area == {

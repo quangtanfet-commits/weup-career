@@ -315,7 +315,7 @@ async def test_export_includes_progress_and_recommendations(
     seeded_competencies: dict[str, str],
     seeded_careers: dict[str, int],
 ) -> None:
-    token, uid = await _adult(client)
+    token, _uid = await _adult(client)
     await _submit(client, token, "riasec")
     # Record an indicator (progress) + generate a recommendation.
     indicators = await client.get("/api/v1/competencies", headers=_auth(token))

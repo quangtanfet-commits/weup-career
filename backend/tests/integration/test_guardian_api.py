@@ -41,7 +41,7 @@ async def _setup_child_and_guardian(
 
 
 async def test_full_consent_flow_activates_child_cp1(client: AsyncClient) -> None:
-    child, child_token, guardian_token = await _setup_child_and_guardian(client)
+    _child, child_token, guardian_token = await _setup_child_and_guardian(client)
 
     invite = await client.post(
         "/api/v1/guardians/invite",
@@ -109,7 +109,7 @@ async def test_duplicate_invite_409(client: AsyncClient) -> None:
 
 async def test_consent_on_foreign_link_404_cp4(client: AsyncClient) -> None:
     """A guardian cannot consent on a link they don't own (returns 404, no leak)."""
-    _, child_token, guardian_token = await _setup_child_and_guardian(client)
+    _, child_token, _guardian_token = await _setup_child_and_guardian(client)
     invite = await client.post(
         "/api/v1/guardians/invite",
         json={"guardian_email": "parent@example.com", "relationship": "mother"},

@@ -30,6 +30,13 @@ services:
       DATABASE_URL: sqlite+aiosqlite:////data/app.db
       ENVIRONMENT: ${ENVIRONMENT:-test}
       LOG_LEVEL: warning
+      # Disable the H-03 app-layer rate limiter for E2E. Behind nginx every
+      # request reaches the backend from a single source IP, so the per-IP
+      # buckets (register 5/h, login 20/min) exhaust within one suite run and
+      # return 429 — which broke the auth-lifecycle flows. Rate-limit behaviour
+      # is already covered deterministically by the backend integration tests
+      # (tests/integration/test_http_hardening.py), so E2E need not exercise it.
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-false}
     # No host port needed — nginx reaches it on the internal network. (The base
     # publishes 8000 for dev convenience; that is harmless here.)
 

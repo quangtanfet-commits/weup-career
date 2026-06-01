@@ -11,7 +11,7 @@ from app.assessments.models import (
     AssessmentItem,
     AssessmentResult,
 )
-from app.auth.models import RefreshToken, User
+from app.auth.models import RefreshToken, RevokedAccessToken, User
 from app.careers.models import (
     CareerPathway,
     CareerProfile,
@@ -55,6 +55,7 @@ __all__ = [
     "Pathway",
     "Recommendation",
     "RefreshToken",
+    "RevokedAccessToken",
     "School",
     "SchoolClass",
     "SchoolMembership",

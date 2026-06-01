@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 from app.auth.age import derive_age_band
 from app.auth.models import RefreshToken, User
-from app.auth.repository import IRefreshTokenRepo, IUserRepo
+from app.auth.repository import IRefreshTokenRepo, IRevokedTokenRepo, IUserRepo
 from app.auth.schemas import LoginRequest, RegisterRequest
 from app.core.audit import IAuditRepo
 from app.core.config import Settings
@@ -60,11 +60,13 @@ class AuthService:
         settings: Settings,
         users: IUserRepo,
         tokens: IRefreshTokenRepo,
+        revoked: IRevokedTokenRepo,
         audit: IAuditRepo,
     ) -> None:
         self._settings = settings
         self._users = users
         self._tokens = tokens
+        self._revoked = revoked
         self._audit = audit
 
     # -- registration -----------------------------------------------------
@@ -203,12 +205,33 @@ class AuthService:
 
     # -- logout -----------------------------------------------------------
 
-    async def logout(self, raw_refresh_token: str | None) -> None:
+    async def logout(
+        self,
+        raw_refresh_token: str | None,
+        *,
+        access_jti: str | None = None,
+        access_exp: int | None = None,
+        user_id: str | None = None,
+    ) -> None:
+        now = datetime.now(UTC)
+        # H-01: denylist the access-token jti for its remaining TTL so a stolen
+        # or post-logout token cannot be replayed (ADR-008 access JWTs are
+        # stateless). This runs even with no refresh cookie — an access-only
+        # logout must still revoke the bearer token.
+        if access_jti and access_exp and user_id:
+            await self._revoked.add(
+                jti=access_jti,
+                user_id=user_id,
+                expires_at=datetime.fromtimestamp(access_exp, UTC),
+            )
+            await self._audit.record(
+                action="auth.access_revoked", actor_id=user_id, target_type="User"
+            )
         if not raw_refresh_token:
             return
         stored = await self._tokens.get_by_hash(hash_refresh_token(raw_refresh_token))
         if stored is not None and stored.revoked_at is None:
-            await self._tokens.revoke(stored, when=datetime.now(UTC))
+            await self._tokens.revoke(stored, when=now)
             await self._audit.record(
                 action="auth.logout", actor_id=stored.user_id, target_type="RefreshToken"
             )

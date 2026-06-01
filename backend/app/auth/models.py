@@ -56,3 +56,22 @@ class RefreshToken(UUIDMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class RevokedAccessToken(UUIDMixin, Base):
+    """Denylisted access-token ``jti`` (H-01).
+
+    Stateless access JWTs (ADR-008) can't be torn down at logout, so logout
+    records the token's ``jti`` here until its ``exp``. Token validation rejects
+    any ``jti`` present with ``expires_at`` still in the future; entries past
+    ``expires_at`` are inert and pruned opportunistically (TTL ≤15 min).
+    """
+
+    __tablename__ = "revoked_access_token"
+
+    jti: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

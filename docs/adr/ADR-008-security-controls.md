@@ -18,7 +18,7 @@ Use **JWT (access) + httpOnly cookie (refresh)** for authentication. Full OWASP 
 - Stored in Zustand memory (not localStorage — XSS-safe)
 - 15-minute expiry minimizes exposure window if intercepted
 - Signed with HS256 (HMAC-SHA256) using a 256-bit secret key
-- Claims: `sub` (user_id), `exp`, `iat`, `jti` (unique token ID for future blacklisting)
+- Claims: `sub` (user_id), `exp`, `iat`, `jti` (unique token ID; denylisted on logout — see H-01 below)
 - Sent as `Authorization: Bearer {token}` header (not in URL, not in cookie)
 
 **Why HS256 and not RS256:**
@@ -37,8 +37,24 @@ Use **JWT (access) + httpOnly cookie (refresh)** for authentication. Full OWASP 
 ### Why not Session Cookies for Everything
 
 - Sessions require server-side session store (Redis/DB lookup on every request)
-- JWTs are self-contained — auth is verified without a DB read (performance)
-- Acceptable tradeoff: JWT access token cannot be revoked before expiry → short expiry (15min) + refresh token rotation mitigates this
+- JWTs are self-contained — auth is verified without a DB read on the happy path (performance)
+- Tradeoff: a self-contained JWT is valid until its `exp` even after logout. Short expiry (15 min) + refresh rotation bound the window; **H-01 (below) closes it** with a small `jti` denylist consulted at validation time.
+
+---
+
+## H-01: Access-token `jti` denylist (logout revocation)
+
+**Status:** Implemented (2026-06-01). Tracks pentest finding PT-01 (reclassified HIGH→LOW; revisit 2026-08-31).
+
+Logout previously revoked only the opaque refresh token, leaving the access JWT replayable until its `exp` (≤15 min). H-01 denylists the access token's `jti` for its remaining lifetime so a stolen or post-logout token cannot be replayed.
+
+- **Storage:** `revoked_access_token` table (`jti` unique-indexed, `user_id` FK CASCADE, `expires_at` = token `exp`, `created_at`). Migration `b1f2c3d4e5a6`.
+- **On logout:** the bearer's `jti` is recorded with `expires_at = exp`; an `auth.access_revoked` audit event is written. This fires even on an **access-only logout** (no refresh cookie present).
+- **At validation:** `get_current_user` / `optional_current_user` reject a token whose `jti` is denylisted → `401`. The check filters on `expires_at > now`, so correctness never depends on pruning having run.
+- **Bounded growth:** `add` is idempotent (double-logout safe) and opportunistically prunes rows past `expires_at`, so the table stays bounded by the 15-min access TTL rather than growing per logout.
+- **Orthogonal to formal verification:** H-01 is additive to the CP-7 refresh lifecycle the TLA+ Gate-B trace models — no `trace_emit` changes.
+
+Out of scope (tracked as **H-02**): invalidating *all prior* access tokens for a user on re-login / password change (current-`jti` or session-version). The `CurrentUser.jti` / `token_exp` plumbing added here is its foundation.
 
 ---
 
@@ -85,3 +101,4 @@ Use **JWT (access) + httpOnly cookie (refresh)** for authentication. Full OWASP 
 - `SECRET_KEY` must be 32+ bytes of random data; managed via Docker secrets in production
 - JWT secret rotation requires re-login of all users (acceptable; documented in runbook)
 - Double-use of refresh token triggers account security alert (future: email notification)
+- H-01 adds one DB write per logout and one indexed `jti` lookup per authenticated request; the `revoked_access_token` table self-prunes to stay bounded by the 15-min access TTL

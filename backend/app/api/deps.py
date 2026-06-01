@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, Request
@@ -17,7 +18,7 @@ from app.account.repository import SqlAccountRepo
 from app.account.service import AccountService
 from app.assessments.repository import SqlAssessmentRepo
 from app.assessments.service import AssessmentService
-from app.auth.repository import SqlRefreshTokenRepo, SqlUserRepo
+from app.auth.repository import SqlRefreshTokenRepo, SqlRevokedTokenRepo, SqlUserRepo
 from app.auth.service import AuthService
 from app.careers.repository import SqlCareerRepo
 from app.careers.service import CareerService
@@ -52,6 +53,10 @@ class CurrentUser:
     age_band: str
     account_status: str
     roles: list[str]
+    # Access-token identity for revocation (H-01). Defaulted so non-HTTP
+    # constructions (tests, internal callers) need not supply them.
+    jti: str = ""
+    token_exp: int = 0
 
 
 def get_db(request: Request) -> Database:
@@ -81,6 +86,12 @@ def user_repo(session: AsyncSession = Depends(get_session)) -> SqlUserRepo:
 
 def token_repo(session: AsyncSession = Depends(get_session)) -> SqlRefreshTokenRepo:
     return SqlRefreshTokenRepo(session)
+
+
+def revoked_token_repo(
+    session: AsyncSession = Depends(get_session),
+) -> SqlRevokedTokenRepo:
+    return SqlRevokedTokenRepo(session)
 
 
 def guardian_repo(session: AsyncSession = Depends(get_session)) -> SqlGuardianRepo:
@@ -130,9 +141,12 @@ def auth_service(
     settings: Settings = Depends(settings_dep),
     users: SqlUserRepo = Depends(user_repo),
     tokens: SqlRefreshTokenRepo = Depends(token_repo),
+    revoked: SqlRevokedTokenRepo = Depends(revoked_token_repo),
     audit: SqlAuditRepo = Depends(audit_repo),
 ) -> AuthService:
-    return AuthService(settings=settings, users=users, tokens=tokens, audit=audit)
+    return AuthService(
+        settings=settings, users=users, tokens=tokens, revoked=revoked, audit=audit
+    )
 
 
 def guardian_service(
@@ -253,22 +267,41 @@ def _user_from_claims(claims: dict[str, Any]) -> CurrentUser:
         age_band=str(claims.get("age_band", "")),
         account_status=str(claims.get("account_status", "")),
         roles=list(claims.get("roles", [])),
+        jti=str(claims.get("jti", "")),
+        token_exp=int(claims.get("exp", 0)),
     )
+
+
+async def _reject_if_revoked(
+    claims: dict[str, Any], revoked: SqlRevokedTokenRepo
+) -> None:
+    """Reject an access token whose ``jti`` has been denylisted on logout (H-01).
+
+    Stateless JWTs (ADR-008) stay cryptographically valid until ``exp``; this is
+    the only per-request hook that can tear one down early. A token with no
+    ``jti`` (legacy/None) is never denylistable and falls through unchanged.
+    """
+    jti = claims.get("jti")
+    if jti and await revoked.is_revoked(str(jti), now=datetime.now(UTC)):
+        raise AuthenticationError()
 
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     settings: Settings = Depends(settings_dep),
+    revoked: SqlRevokedTokenRepo = Depends(revoked_token_repo),
 ) -> CurrentUser:
     if credentials is None or not credentials.credentials:
         raise AuthenticationError()
     claims = decode_access_token(credentials.credentials, settings=settings)
+    await _reject_if_revoked(claims, revoked)
     return _user_from_claims(claims)
 
 
 async def optional_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     settings: Settings = Depends(settings_dep),
+    revoked: SqlRevokedTokenRepo = Depends(revoked_token_repo),
 ) -> CurrentUser | None:
     """Resolve the Bearer identity if present; ``None`` for an anonymous caller.
 
@@ -287,6 +320,7 @@ async def optional_current_user(
     if credentials is None or not credentials.credentials:
         return None
     claims = decode_access_token(credentials.credentials, settings=settings)
+    await _reject_if_revoked(claims, revoked)
     return _user_from_claims(claims)
 
 

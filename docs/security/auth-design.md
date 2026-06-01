@@ -73,6 +73,33 @@ Client                              Server
 
 ---
 
+## Denylist Access Token khi logout (H-01)
+
+**Trạng thái:** Đã triển khai (2026-06-01). Đóng lỗ hổng pentest PT-01 (hạ HIGH→LOW; xem lại 2026-08-31).
+
+Access JWT là **stateless** nên trước đây vẫn hợp lệ tới `exp` (≤15') kể cả sau khi logout — token bị đánh cắp hoặc dùng lại sau logout vẫn replay được. H-01 đưa `jti` của access token vào **danh sách thu hồi** trong thời gian sống còn lại để chặn replay.
+
+```
+Client                                Server
+  │── POST /auth/logout (Bearer AT) ──►│ 1. Revoke refresh token (như cũ)
+  │                                    │ 2. INSERT revoked_access_token
+  │                                    │    (jti, user_id, expires_at = AT.exp)
+  │                                    │    + audit auth.access_revoked
+  │◄─ 204 No Content ──────────────────│
+  │── GET /auth/me (Bearer AT cũ) ────►│ jti nằm trong denylist → 401
+```
+
+- **Lưu trữ:** bảng `revoked_access_token` (`jti` unique-index, `user_id` FK CASCADE, `expires_at` = `exp` của token, `created_at`). Migration `b1f2c3d4e5a6`.
+- **Kiểm tra khi xác thực:** `get_current_user` / `optional_current_user` từ chối token có `jti` bị denylist → **401**. Điều kiện lọc `expires_at > now`, nên tính đúng đắn **không phụ thuộc** vào việc prune đã chạy hay chưa.
+- **Logout chỉ-access:** vẫn thu hồi `jti` ngay cả khi **không có** refresh cookie.
+- **Bị chặn theo user:** logout của user A không ảnh hưởng token của user B (cô lập theo `jti`).
+- **Bảng có giới hạn:** `add` idempotent (logout 2 lần an toàn) và prune cơ hội các dòng quá `expires_at`, giữ bảng bị chặn bởi TTL access 15' thay vì phình theo mỗi lần logout.
+- **Độc lập với formal verification:** H-01 là lớp bổ sung, không đụng vòng đời refresh CP-7 mà TLA+ Gate-B mô hình hóa — không thay đổi `trace_emit`.
+
+> Ngoài phạm vi (theo dõi là **H-02**): vô hiệu hóa **mọi** access token cũ của user khi đăng nhập lại / đổi mật khẩu (current-`jti` hoặc session-version). Phần plumbing `CurrentUser.jti` / `token_exp` thêm ở đây là nền tảng cho H-02.
+
+---
+
 ## ⭐ Lớp 2 — Cổng đồng ý giám hộ (Consent Authorization) — CP-1/CP-2
 
 Trước **mọi** route xử lý dữ liệu hướng nghiệp (trắc nghiệm, gợi ý, tiến bộ), một dependency tập trung kiểm tra:
@@ -177,7 +204,7 @@ Sự kiện auth + **sự kiện pháp lý/nhạy cảm** đều ghi audit (appe
 ```
 
 Sự kiện được ghi:
-- Auth: `auth.register.*`, `auth.login.*`, `auth.logout`, `auth.token.refreshed`, `auth.token.reuse_detected`
+- Auth: `auth.register.*`, `auth.login.*`, `auth.logout`, `auth.access_revoked`, `auth.token.refreshed`, `auth.token.reuse_detected`
 - Consent: `guardian.invited`, `guardian.consent.granted`, `guardian.consent.revoked`
 - Nhạy cảm (CP-3): `assessment.result.read`, `assessment.result.exported`, `assessment.result.deleted`
 - Gợi ý (giải trình AI): `recommendation.created`, `recommendation.confirmed` (kèm `confirmed_by`, `decision`)

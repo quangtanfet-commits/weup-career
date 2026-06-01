@@ -96,7 +96,12 @@ async def logout(
     _current: CurrentUser = Depends(get_current_user),
     service: AuthService = Depends(auth_service),
 ) -> Response:
-    await service.logout(request.cookies.get(REFRESH_COOKIE))
+    await service.logout(
+        request.cookies.get(REFRESH_COOKIE),
+        access_jti=_current.jti,
+        access_exp=_current.token_exp,
+        user_id=_current.id,
+    )
     response.delete_cookie(REFRESH_COOKIE, path="/api/v1/auth")
     response.status_code = status.HTTP_204_NO_CONTENT
     return response

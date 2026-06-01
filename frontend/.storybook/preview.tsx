@@ -1,9 +1,26 @@
+import { Be_Vietnam_Pro } from "next/font/google";
 import type { Preview } from "@storybook/nextjs-vite";
 
 // Load the app's Tailwind layer + design tokens so stories render with the same
 // styling as production (Chromatic then pixel-diffs the real surfaces, not bare
 // unstyled DOM). Mirrors app/layout.tsx's `import "@/styles/globals.css"`.
 import "@/styles/globals.css";
+
+// Mirror app/layout.tsx's font wiring. Without this, `--font-be-vietnam-pro` is
+// undefined in Storybook, `--font-sans` collapses to an invalid leading-comma
+// value, and stories fall back to the UA font (Times New Roman) — see
+// docs/frontend/migrations/tailwind-4.md. @storybook/nextjs-vite self-hosts the
+// font at build time, so the render is deterministic (Chromatic-safe).
+const beVietnamPro = Be_Vietnam_Pro({
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-be-vietnam-pro",
+  display: "swap",
+});
+
+if (typeof document !== "undefined") {
+  document.documentElement.classList.add(beVietnamPro.variable);
+}
 
 const preview: Preview = {
   parameters: {

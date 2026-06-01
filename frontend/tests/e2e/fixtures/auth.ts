@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
@@ -27,7 +29,7 @@ const NAV_TIMEOUT = 15_000;
 export type Credentials = { email: string; password: string };
 
 export function uniqueEmail(prefix = "f-auth"): string {
-  const rand = Math.random().toString(36).slice(2, 10);
+  const rand = randomUUID().slice(0, 8);
   return `${prefix}-${Date.now()}-${rand}@example.vn`;
 }
 

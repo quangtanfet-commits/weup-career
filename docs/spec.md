@@ -1,8 +1,8 @@
 # NLSpec: Nền tảng Hướng nghiệp Quốc gia — WeUp Career
 
 **Phiên bản:** 2.0.0
-**Ngày:** 2026-05-29
-**Trạng thái:** DRAFT — Chờ phê duyệt triển khai
+**Ngày:** 2026-05-29 (cập nhật trạng thái 2026-06-01)
+**Trạng thái:** IMPLEMENTED — MVP (THCS + THPT) đã triển khai & verify đầy đủ. Backend 8 slice + hardening H-01/02/03; Frontend 8 slice tính năng; TLA+ Gate A + Gate B 6/6 (CP-1→CP-8). Còn mở: PT-04 (email enumeration), Gate C (load test p99, per-layer 100% coverage NFR-19).
 **Tác giả:** Engineering Team
 **Thay thế:** v1.0.0 (spec Todo app — placeholder, đã loại bỏ)
 

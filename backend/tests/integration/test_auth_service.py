@@ -212,9 +212,7 @@ async def test_revoke_all_for_user(session: AsyncSession, settings: Settings) ->
 # -- H-01 access-token denylist --------------------------------------------
 
 
-async def test_revoked_repo_add_then_is_revoked(
-    session: AsyncSession, settings: Settings
-) -> None:
+async def test_revoked_repo_add_then_is_revoked(session: AsyncSession, settings: Settings) -> None:
     repo = SqlRevokedTokenRepo(session)
     user = await _make_user(session)
     now = datetime.now(UTC)
@@ -236,9 +234,7 @@ async def test_revoked_repo_expired_entry_treated_as_absent(
     assert await repo.is_revoked("jti-stale", now=now) is False
 
 
-async def test_revoked_repo_add_is_idempotent(
-    session: AsyncSession, settings: Settings
-) -> None:
+async def test_revoked_repo_add_is_idempotent(session: AsyncSession, settings: Settings) -> None:
     """Double logout reuses the same jti (unique column) — re-adding is a no-op,
     not an IntegrityError."""
     repo = SqlRevokedTokenRepo(session)
@@ -268,9 +264,7 @@ async def test_revoked_repo_add_prunes_expired_rows(
     assert count == 1
 
 
-async def test_logout_denylists_access_jti(
-    session: AsyncSession, settings: Settings
-) -> None:
+async def test_logout_denylists_access_jti(session: AsyncSession, settings: Settings) -> None:
     """Access-only logout (no refresh cookie) still revokes the bearer jti."""
     svc = _service(session, settings)
     user = await _make_user(session)
@@ -281,9 +275,7 @@ async def test_logout_denylists_access_jti(
     assert await repo.is_revoked("jti-logout", now=now) is True
 
 
-async def test_logout_idempotent_on_same_jti(
-    session: AsyncSession, settings: Settings
-) -> None:
+async def test_logout_idempotent_on_same_jti(session: AsyncSession, settings: Settings) -> None:
     """Logging out twice with the same access token leaves exactly one row."""
     from app.auth.models import RevokedAccessToken
     from sqlalchemy import func, select

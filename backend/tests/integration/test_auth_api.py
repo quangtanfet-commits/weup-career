@@ -218,9 +218,7 @@ async def test_logout_does_not_affect_other_users_h01(client: AsyncClient) -> No
     token_a = await _register_login(client)
     client.cookies.clear()
     # Second, independent user.
-    await client.post(
-        "/api/v1/auth/register", json=register_payload(email="other@example.com")
-    )
+    await client.post("/api/v1/auth/register", json=register_payload(email="other@example.com"))
     login_b = await client.post(
         "/api/v1/auth/login",
         json={"email": "other@example.com", "password": "Password123"},
@@ -228,15 +226,11 @@ async def test_logout_does_not_affect_other_users_h01(client: AsyncClient) -> No
     token_b = login_b.json()["access_token"]
     # A logs out.
     assert (
-        await client.post(
-            "/api/v1/auth/logout", headers={"Authorization": f"Bearer {token_a}"}
-        )
+        await client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token_a}"})
     ).status_code == 204
     # B's token is untouched.
     assert (
-        await client.get(
-            "/api/v1/auth/me", headers={"Authorization": f"Bearer {token_b}"}
-        )
+        await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token_b}"})
     ).status_code == 200
 
 
@@ -253,9 +247,7 @@ async def test_relogin_after_logout_issues_working_token_h01(
     new_token = relogin.json()["access_token"]
     assert new_token != token
     assert (
-        await client.get(
-            "/api/v1/auth/me", headers={"Authorization": f"Bearer {new_token}"}
-        )
+        await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {new_token}"})
     ).status_code == 200
 
 
@@ -267,9 +259,7 @@ async def test_denylisted_token_rejected_on_public_read_h01(client: AsyncClient)
     # Anonymous public read is allowed.
     assert (await client.get("/api/v1/careers")).status_code == 200
     # But presenting the denylisted token is an explicit auth attempt → 401.
-    resp = await client.get(
-        "/api/v1/careers", headers={"Authorization": f"Bearer {token}"}
-    )
+    resp = await client.get("/api/v1/careers", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401
 
 

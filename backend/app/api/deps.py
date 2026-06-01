@@ -144,9 +144,7 @@ def auth_service(
     revoked: SqlRevokedTokenRepo = Depends(revoked_token_repo),
     audit: SqlAuditRepo = Depends(audit_repo),
 ) -> AuthService:
-    return AuthService(
-        settings=settings, users=users, tokens=tokens, revoked=revoked, audit=audit
-    )
+    return AuthService(settings=settings, users=users, tokens=tokens, revoked=revoked, audit=audit)
 
 
 def guardian_service(
@@ -272,9 +270,7 @@ def _user_from_claims(claims: dict[str, Any]) -> CurrentUser:
     )
 
 
-async def _reject_if_revoked(
-    claims: dict[str, Any], revoked: SqlRevokedTokenRepo
-) -> None:
+async def _reject_if_revoked(claims: dict[str, Any], revoked: SqlRevokedTokenRepo) -> None:
     """Reject an access token whose ``jti`` has been denylisted on logout (H-01).
 
     Stateless JWTs (ADR-008) stay cryptographically valid until ``exp``; this is

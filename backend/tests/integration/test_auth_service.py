@@ -11,7 +11,11 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from app.auth.models import RefreshToken, User
-from app.auth.repository import SqlRefreshTokenRepo, SqlUserRepo
+from app.auth.repository import (
+    SqlRefreshTokenRepo,
+    SqlRevokedTokenRepo,
+    SqlUserRepo,
+)
 from app.auth.schemas import LoginRequest, RegisterRequest
 from app.auth.service import AuthService, _as_utc
 from app.core.audit import SqlAuditRepo
@@ -28,6 +32,7 @@ def _service(session: AsyncSession, settings: Settings) -> AuthService:
         settings=settings,
         users=SqlUserRepo(session),
         tokens=SqlRefreshTokenRepo(session),
+        revoked=SqlRevokedTokenRepo(session),
         audit=SqlAuditRepo(session),
     )
 
@@ -202,3 +207,87 @@ async def test_revoke_all_for_user(session: AsyncSession, settings: Settings) ->
     assert revoked == 3
     # Idempotent: nothing left active to revoke.
     assert await repo.revoke_all_for_user(user.id, when=datetime.now(UTC)) == 0
+
+
+# -- H-01 access-token denylist --------------------------------------------
+
+
+async def test_revoked_repo_add_then_is_revoked(session: AsyncSession, settings: Settings) -> None:
+    repo = SqlRevokedTokenRepo(session)
+    user = await _make_user(session)
+    now = datetime.now(UTC)
+    await repo.add(jti="jti-live", user_id=user.id, expires_at=now + timedelta(minutes=15))
+    assert await repo.is_revoked("jti-live", now=now) is True
+    # An unknown jti is never revoked.
+    assert await repo.is_revoked("jti-absent", now=now) is False
+
+
+async def test_revoked_repo_expired_entry_treated_as_absent(
+    session: AsyncSession, settings: Settings
+) -> None:
+    """is_revoked filters on expires_at > now, so correctness never depends on
+    pruning having run: a row past its expiry reads as absent."""
+    repo = SqlRevokedTokenRepo(session)
+    user = await _make_user(session)
+    now = datetime.now(UTC)
+    await repo.add(jti="jti-stale", user_id=user.id, expires_at=now - timedelta(seconds=1))
+    assert await repo.is_revoked("jti-stale", now=now) is False
+
+
+async def test_revoked_repo_add_is_idempotent(session: AsyncSession, settings: Settings) -> None:
+    """Double logout reuses the same jti (unique column) — re-adding is a no-op,
+    not an IntegrityError."""
+    repo = SqlRevokedTokenRepo(session)
+    user = await _make_user(session)
+    now = datetime.now(UTC)
+    exp = now + timedelta(minutes=15)
+    await repo.add(jti="jti-dup", user_id=user.id, expires_at=exp)
+    await repo.add(jti="jti-dup", user_id=user.id, expires_at=exp)  # no error
+    assert await repo.is_revoked("jti-dup", now=now) is True
+
+
+async def test_revoked_repo_add_prunes_expired_rows(
+    session: AsyncSession, settings: Settings
+) -> None:
+    """Each add() opportunistically drops inert rows so the table stays bounded
+    by the access-token TTL rather than growing per logout forever."""
+    from app.auth.models import RevokedAccessToken
+    from sqlalchemy import func, select
+
+    repo = SqlRevokedTokenRepo(session)
+    user = await _make_user(session)
+    now = datetime.now(UTC)
+    await repo.add(jti="jti-old", user_id=user.id, expires_at=now - timedelta(seconds=1))
+    # Insert a fresh entry — its add() prunes the expired "jti-old".
+    await repo.add(jti="jti-new", user_id=user.id, expires_at=now + timedelta(minutes=15))
+    count = await session.scalar(select(func.count()).select_from(RevokedAccessToken))
+    assert count == 1
+
+
+async def test_logout_denylists_access_jti(session: AsyncSession, settings: Settings) -> None:
+    """Access-only logout (no refresh cookie) still revokes the bearer jti."""
+    svc = _service(session, settings)
+    user = await _make_user(session)
+    now = datetime.now(UTC)
+    exp = int((now + timedelta(minutes=15)).timestamp())
+    await svc.logout(None, access_jti="jti-logout", access_exp=exp, user_id=user.id)
+    repo = SqlRevokedTokenRepo(session)
+    assert await repo.is_revoked("jti-logout", now=now) is True
+
+
+async def test_logout_idempotent_on_same_jti(session: AsyncSession, settings: Settings) -> None:
+    """Logging out twice with the same access token leaves exactly one row."""
+    from app.auth.models import RevokedAccessToken
+    from sqlalchemy import func, select
+
+    svc = _service(session, settings)
+    user = await _make_user(session)
+    exp = int((datetime.now(UTC) + timedelta(minutes=15)).timestamp())
+    await svc.logout(None, access_jti="jti-twice", access_exp=exp, user_id=user.id)
+    await svc.logout(None, access_jti="jti-twice", access_exp=exp, user_id=user.id)
+    count = await session.scalar(
+        select(func.count())
+        .select_from(RevokedAccessToken)
+        .where(RevokedAccessToken.jti == "jti-twice")
+    )
+    assert count == 1

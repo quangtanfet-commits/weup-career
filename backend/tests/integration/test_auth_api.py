@@ -190,6 +190,79 @@ async def test_logout_requires_auth(client: AsyncClient) -> None:
     assert (await client.post("/api/v1/auth/logout")).status_code == 401
 
 
+async def test_logout_denylists_access_token_h01(client: AsyncClient) -> None:
+    """H-01: the access token presented at logout is dead immediately after,
+    even though it is cryptographically valid until its 15-min exp."""
+    token = await _register_login(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    # Token works before logout.
+    assert (await client.get("/api/v1/auth/me", headers=auth)).status_code == 200
+    assert (await client.post("/api/v1/auth/logout", headers=auth)).status_code == 204
+    # Same token is now rejected (denylisted jti).
+    assert (await client.get("/api/v1/auth/me", headers=auth)).status_code == 401
+
+
+async def test_logout_access_only_denylists_without_refresh_cookie_h01(
+    client: AsyncClient,
+) -> None:
+    """An access-only logout (no refresh cookie) still revokes the bearer."""
+    token = await _register_login(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    client.cookies.clear()  # drop the refresh cookie — access-only logout
+    assert (await client.post("/api/v1/auth/logout", headers=auth)).status_code == 204
+    assert (await client.get("/api/v1/auth/me", headers=auth)).status_code == 401
+
+
+async def test_logout_does_not_affect_other_users_h01(client: AsyncClient) -> None:
+    """One user's logout must not denylist another user's token (isolation)."""
+    token_a = await _register_login(client)
+    client.cookies.clear()
+    # Second, independent user.
+    await client.post("/api/v1/auth/register", json=register_payload(email="other@example.com"))
+    login_b = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "other@example.com", "password": "Password123"},
+    )
+    token_b = login_b.json()["access_token"]
+    # A logs out.
+    assert (
+        await client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token_a}"})
+    ).status_code == 204
+    # B's token is untouched.
+    assert (
+        await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token_b}"})
+    ).status_code == 200
+
+
+async def test_relogin_after_logout_issues_working_token_h01(
+    client: AsyncClient,
+) -> None:
+    """A fresh login after logout yields a new, non-denylisted token."""
+    token = await _register_login(client)
+    await client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"})
+    relogin = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "adult@example.com", "password": "Password123"},
+    )
+    new_token = relogin.json()["access_token"]
+    assert new_token != token
+    assert (
+        await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {new_token}"})
+    ).status_code == 200
+
+
+async def test_denylisted_token_rejected_on_public_read_h01(client: AsyncClient) -> None:
+    """A denylisted token on an ``optional_current_user`` route → 401, per the
+    present-but-invalid policy. Anonymous (no header) still reads fine."""
+    token = await _register_login(client)
+    await client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"})
+    # Anonymous public read is allowed.
+    assert (await client.get("/api/v1/careers")).status_code == 200
+    # But presenting the denylisted token is an explicit auth attempt → 401.
+    resp = await client.get("/api/v1/careers", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
 async def test_correlation_id_echoed(client: AsyncClient) -> None:
     resp = await client.get("/api/v1/health", headers={"X-Request-ID": "req_custom_123"})
     assert resp.headers["X-Request-ID"] == "req_custom_123"

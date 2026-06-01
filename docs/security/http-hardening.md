@@ -101,6 +101,7 @@ Chọn **fixed-window counter** (đơn giản, không cần dependency ngoài):
 - `conftest.make_settings()` đặt `rate_limit_enabled=False` để 394 test hiện có không bị nhiễu.
 - Test chuyên biệt bật cờ + đặt limit thấp (vd 2) để có 429 tất định.
 - Các giới hạn & cửa sổ cũng là setting (giá trị mặc định = bảng 3.1) để test ép số nhỏ.
+- **Stack E2E (`docker-compose.test.yml`) cũng tắt cờ** (`RATE_LIMIT_ENABLED=false`). Sau nginx, mọi request tới backend đến từ **một** source IP, nên các bucket theo-IP (register 5/h, login 20/min) cạn trong một lần chạy suite và trả 429 — làm hỏng các luồng auth-lifecycle. Hành vi rate-limit đã được phủ tất định bởi `tests/integration/test_http_hardening.py`, nên E2E không cần kiểm thử lại.
 
 ---
 

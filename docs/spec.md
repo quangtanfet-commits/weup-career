@@ -2,7 +2,7 @@
 
 **Phiên bản:** 2.0.0
 **Ngày:** 2026-05-29 (cập nhật trạng thái 2026-06-01)
-**Trạng thái:** IMPLEMENTED — MVP (THCS + THPT) đã triển khai & verify đầy đủ. Backend 8 slice + hardening H-01/02/03; Frontend 8 slice tính năng; TLA+ Gate A + Gate B 6/6 (CP-1→CP-8). Còn mở: PT-04 (email enumeration), Gate C (load test p99, per-layer 100% coverage NFR-19).
+**Trạng thái:** IMPLEMENTED — MVP (THCS + THPT) đã triển khai & verify đầy đủ. Backend 8 slice + hardening H-01/02/03/04; Frontend 8 slice tính năng; TLA+ Gate A + Gate B 6/6 (CP-1→CP-8). Còn mở: Gate C (load test p99, per-layer 100% coverage NFR-19). Dư lượng đã chấp nhận: email verification (khắc phục triệt để PT-04 residual).
 **Tác giả:** Engineering Team
 **Thay thế:** v1.0.0 (spec Todo app — placeholder, đã loại bỏ)
 

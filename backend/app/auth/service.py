@@ -17,7 +17,6 @@ from app.core.audit import IAuditRepo
 from app.core.config import Settings
 from app.core.enums import AccountStatus, AgeBand, Role, UserType
 from app.core.exceptions import (
-    ConflictError,
     InvalidCredentialsError,
     TokenError,
 )
@@ -72,10 +71,6 @@ class AuthService:
     # -- registration -----------------------------------------------------
 
     async def register(self, payload: RegisterRequest) -> User:
-        existing = await self._users.get_by_email(payload.email)
-        if existing is not None:
-            raise ConflictError("Email đã được đăng ký")
-
         age_band = derive_age_band(
             payload.date_of_birth,
             threshold=self._settings.consent_age_threshold,
@@ -86,6 +81,36 @@ class AuthService:
             if age_band == AgeBand.UNDER_16
             else AccountStatus.ACTIVE
         )
+
+        existing = await self._users.get_by_email(payload.email)
+        if existing is not None:
+            # PT-04: do not leak that the email is taken. Return an
+            # indistinguishable synthesized 201 derived purely from the
+            # submitted payload — fresh random id (never the existing user's),
+            # request-derived fields, explicit created_at (no flush to fill it)
+            # — as a pure no-op: no DB write, no mutation of the existing
+            # account. Burn the same bcrypt cost as the real path to equalise
+            # timing, and audit defender-side only (attacker never sees it).
+            # See docs/security/email-enumeration.md.
+            verify_password(payload.password, _DUMMY_HASH)
+            await self._audit.record(
+                action="auth.register.duplicate_suppressed",
+                actor_id=existing.id,
+                target_type="User",
+                target_id=existing.id,
+            )
+            return User(
+                id=new_uuid(),
+                email=payload.email,
+                hashed_password="",
+                date_of_birth=payload.date_of_birth,
+                age_band=age_band,
+                user_type=payload.user_type,
+                school_level=payload.school_level,
+                account_status=account_status,
+                created_at=utcnow(),
+            )
+
         user = User(
             id=new_uuid(),
             email=payload.email,

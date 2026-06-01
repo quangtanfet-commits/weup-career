@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **H-01** — Access-token JTI denylist khi logout, thu hồi token còn hạn (PR #36) → khắc phục PT-01
 - **H-02** — Session-version epoch, vô hiệu hóa hàng loạt access token khi re-login/đổi mật khẩu (PR #37) → khắc phục PT-02
 - **H-03** — Security headers + rate limiting trên auth endpoints (PR #38, fix E2E ratelimit PR #49) → khắc phục PT-03, PT-05
+- **H-04** — Register response không phân biệt được cho email trùng (synthesized-201, no-op, timing-equalized, audit phía phòng thủ) → khắc phục PT-04 email enumeration
 
 ### Added — Kiểm chứng hình thức
 - TLA+ 6 module ↔ CP-1…CP-8; Gate A (model check) + Gate B (conformance trace replay) 6/6; sabotage-check 6/6 pass

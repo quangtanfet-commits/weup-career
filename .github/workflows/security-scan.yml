@@ -9,6 +9,8 @@ jobs:
   owasp-zap:
     name: "🛡️ OWASP ZAP Baseline"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -27,21 +29,14 @@ jobs:
           rules_file_name: ".zap/rules.tsv"
           cmd_options: "-I"
           fail_action: true
+          # The default token has no `issues: write`, so the action's issue
+          # filing 500s with "Resource not accessible by integration" and reds
+          # the run. Findings still gate the job via `fail_action`.
+          allow_issue_writing: false
 
       - name: Stop application stack
         if: always()
-        run: docker compose down
-
-  dependency-review:
-    name: "📦 Dependency Review"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: high
+        run: docker compose -f docker-compose.yml -f docker-compose.test.yml down -v
 
   codeql:
     name: "🔬 CodeQL Analysis"

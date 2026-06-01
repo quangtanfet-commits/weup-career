@@ -1,0 +1,11 @@
+# OWASP ZAP Baseline rules — WeUp Career
+#
+# Referenced by .github/workflows/security-scan.yml (zaproxy/action-baseline).
+# Tab-separated: <pluginId>	<threshold>	<optional url-regex>
+#   threshold ∈ { IGNORE | WARN | FAIL }
+# Lines starting with '#' are comments. With no overrides below, every alert
+# uses the ZAP default (WARN), so the baseline scan reports but does not fail.
+# To hard-fail a class of finding, add a row with FAIL; to silence a known
+# acceptable one, add IGNORE with a rationale comment above it.
+#
+# pluginId	threshold	url-regex (optional)

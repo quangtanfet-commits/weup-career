@@ -35,7 +35,7 @@ from app.core.consent import require_consent
 from app.core.crypto import FieldCrypto
 from app.core.database import Database
 from app.core.exceptions import AuthenticationError, PermissionDeniedError
-from app.core.mailer import ConsoleMailer, IMailer, SmtpMailer
+from app.core.mailer import ConsoleMailer, FileMailer, IMailer, SmtpMailer
 from app.core.security import decode_access_token
 from app.guardians.repository import SqlGuardianRepo
 from app.guardians.service import GuardianService
@@ -152,6 +152,10 @@ def mailer(settings: Settings = Depends(settings_dep)) -> IMailer:
     # leaking the token to logs. Tests override this with a CapturingMailer.
     if settings.is_production:
         return SmtpMailer()
+    # Non-prod with a configured outbox → FileMailer, so the out-of-process E2E
+    # harness can read the raw token (NDJSON outbox). Otherwise log to console.
+    if settings.mailer_outbox_path:
+        return FileMailer(settings.mailer_outbox_path)
     return ConsoleMailer()
 
 

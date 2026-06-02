@@ -8,33 +8,16 @@ vi.mock("next/navigation", () => ({
 }));
 
 const registerAccount = vi.fn();
-const login = vi.fn();
+const resendVerification = vi.fn();
 vi.mock("@/lib/api/endpoints/auth", () => ({
   register: (...args: unknown[]) => registerAccount(...args),
-  login: (...args: unknown[]) => login(...args),
+  resendVerification: (...args: unknown[]) => resendVerification(...args),
 }));
 
 import { RegisterForm } from "@/features/auth/RegisterForm";
 import { ApiError } from "@/lib/api/errors";
 import { useAuthStore, getAccessToken } from "@/lib/auth/store";
 import { renderWithIntl, viMessages } from "./helpers/intl";
-
-function tokenResponse(accountStatus: string, ageBand: string) {
-  return {
-    access_token: "registered-token",
-    expires_in: 900,
-    token_type: "bearer",
-    user: {
-      id: "u1",
-      email: "child@b.vn",
-      account_status: accountStatus,
-      age_band: ageBand,
-      user_type: "student",
-      school_level: "lower_secondary",
-      created_at: "2026-01-01T00:00:00Z",
-    },
-  };
-}
 
 async function fillBaseFields(
   user: ReturnType<typeof userEvent.setup>,
@@ -53,7 +36,7 @@ describe("RegisterForm", () => {
   beforeEach(() => {
     replace.mockReset();
     registerAccount.mockReset();
-    login.mockReset();
+    resendVerification.mockReset();
     useAuthStore.getState().clearSession();
   });
   afterEach(() => {
@@ -75,28 +58,13 @@ describe("RegisterForm", () => {
     ).toBeInTheDocument();
   });
 
-  it("registers then logs in and routes a child to /consent", async () => {
-    registerAccount.mockResolvedValue({ id: "u1" });
-    login.mockResolvedValue(
-      tokenResponse("pending_guardian_consent", "under_16"),
-    );
-    const user = userEvent.setup();
-    renderWithIntl(<RegisterForm />);
-
-    await fillBaseFields(user, "2015-01-01");
-    await user.click(
-      screen.getByRole("button", { name: viMessages.auth.registerSubmit }),
-    );
-
-    await waitFor(() => expect(registerAccount).toHaveBeenCalledTimes(1));
-    expect(login).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(getAccessToken()).toBe("registered-token"));
-    expect(replace).toHaveBeenCalledWith("/consent");
-  });
-
-  it("routes an adult registrant straight to the dashboard", async () => {
-    registerAccount.mockResolvedValue({ id: "u1" });
-    login.mockResolvedValue(tokenResponse("active", "adult"));
+  it("on success shows the check-email notice with no session and no navigation (N-3)", async () => {
+    // Register now returns 202 with no token (email-verification-2026-06.md
+    // §3.1): the form is replaced by the check-email notice — it must NOT open a
+    // session or route anywhere (consent routing moved to login). The child/adult
+    // distinction no longer affects the register-success path, so one case covers
+    // it; the <16 guardian *notice while typing* is covered by its own test above.
+    registerAccount.mockResolvedValue(undefined);
     const user = userEvent.setup();
     renderWithIntl(<RegisterForm />);
 
@@ -105,7 +73,42 @@ describe("RegisterForm", () => {
       screen.getByRole("button", { name: viMessages.auth.registerSubmit }),
     );
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
+    await waitFor(() => expect(registerAccount).toHaveBeenCalledTimes(1));
+    expect(
+      await screen.findByRole("heading", {
+        name: viMessages.auth.checkEmailTitle,
+      }),
+    ).toBeInTheDocument();
+    // No session, no redirect, no token in the store.
+    expect(replace).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it("resends the verification email from the check-email notice", async () => {
+    // From the notice, the resend button calls resendVerification(email) once and
+    // surfaces the neutral (enumeration-safe) confirmation regardless of outcome.
+    registerAccount.mockResolvedValue(undefined);
+    resendVerification.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderWithIntl(<RegisterForm />);
+
+    await fillBaseFields(user, "1995-01-01");
+    await user.click(
+      screen.getByRole("button", { name: viMessages.auth.registerSubmit }),
+    );
+    await screen.findByRole("heading", {
+      name: viMessages.auth.checkEmailTitle,
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: viMessages.auth.resend }),
+    );
+    await waitFor(() =>
+      expect(resendVerification).toHaveBeenCalledWith("child@b.vn"),
+    );
+    expect(
+      await screen.findByText(viMessages.auth.resendDone),
+    ).toBeInTheDocument();
   });
 
   it("surfaces the backend error message when registration fails", async () => {

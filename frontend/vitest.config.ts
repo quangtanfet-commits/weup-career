@@ -46,6 +46,10 @@ export default defineConfig({
         "lib/api/schema.ts",
         "lib/i18n/request.ts",
         "**/*.d.ts",
+        // Storybook stories are non-logic component galleries — their states are
+        // covered by the Storybook build + Chromatic visual regression, not unit
+        // asserts. Counting them would pad the denominator with 0%-logic files.
+        "**/*.stories.{ts,tsx}",
       ],
       thresholds: {
         statements: 90,

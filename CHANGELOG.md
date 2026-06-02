@@ -38,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed — Nâng cấp major frontend (Dependabot held bumps, doc-first, 2026-06-01)
 - Vitest 2 → 4 (PR #52) · Tailwind CSS 3 → 4 Oxide/Lightning (PR #53) · Next 15 → 16.2.6 + next-intl 4 + ESLint 9 flat config (PR #54)
 
+### Changed — Bảo mật & dependency triage (2026-06)
+- **Ruff** nới trần `<0.16` (PR #51) để theo dòng phát hành linter.
+- **Security-quality triage** (PR #61, [docs/security/security-quality-triage-2026-06.md](docs/security/security-quality-triage-2026-06.md)):
+  - `postcss` override `^8.5.10` ép toàn cây ≥ 8.5.10 (CVE-2026-41305, vá bản nested do `next` bundle) → Dependabot #4 `fixed`.
+  - **pytest** 8 → 9.0.3 + **pytest-asyncio** 0.24 → 1.4 (coordinated, CVE-2025-71176 tmpdir) → Dependabot #3 `fixed`.
+  - CodeQL `js/insecure-randomness`: e2e fixture dùng `crypto.randomUUID()` thay `Math.random()`.
+  - Dismiss 2 CodeQL `py/weak-sensitive-data-hashing` (false-positive: idiom `bcrypt_sha256`, hash thật là bcrypt cost 12).
+
 ### Changed
 - **Tái thiết kế toàn bộ tài liệu thiết kế từ domain Todo (placeholder) sang domain Hướng nghiệp Quốc gia WeUp Career.**
   - `docs/spec.md` v2.0.0 — NLSpec hướng nghiệp, neo vào TT 16/2026 Điều 5; 8 thuộc tính đúng đắn (CP-1…CP-8)

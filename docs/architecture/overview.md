@@ -53,7 +53,7 @@ C4Container
     Person(student, "Học sinh / Giám hộ / Counselor", "Web browser")
 
     Container(nginx, "Nginx Reverse Proxy", "nginx:alpine", "TLS termination, static serving, /api routing, rate limiting L7")
-    Container(frontend, "Frontend", "Next.js 15 App Router / React 19 / TS", "RSC public Điều 5a (SEO) + client app; REST + JSON; phân tầng UI theo school_level")
+    Container(frontend, "Frontend", "Next.js 16 App Router / React 19 / TS", "RSC public Điều 5a (SEO) + client app; REST + JSON; phân tầng UI theo school_level")
     Container(backend, "Backend API", "Python 3.12 / FastAPI / Uvicorn", "REST API; JWT; consent gate; xử lý dữ liệu nhạy cảm; audit")
     Container(recsvc, "Recommendation Engine", "Python module / service", "Gợi ý ngành/nghề/lộ trình CÓ GIẢI THÍCH; bias-tested; không tự quyết")
     ContainerDb(database, "Database", "SQLite 3.45 (MVP) → PostgreSQL", "Lưu trữ; trường nhạy cảm mã hóa; abstract qua SQLAlchemy")
@@ -114,7 +114,7 @@ C4Component
 
 ```mermaid
 C4Component
-    title Component Diagram — Frontend (Next.js 15 / React 19)
+    title Component Diagram — Frontend (Next.js 16 / React 19)
 
     Container_Boundary(spa, "Frontend (Next.js)") {
         Component(router, "App Router", "Next.js file routing", "(public) RSC SEO Điều 5a + (app) client; guard vai trò; chặn route [gate] nếu account=pending_guardian_consent")

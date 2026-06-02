@@ -6,6 +6,8 @@
 **Supersedes:** Phần Frontend của [ADR-001](ADR-001-framework-selection.md) (React 18 + Vite 5, CSR-only SPA). Backend (FastAPI) của ADR-001 **giữ nguyên**.
 **Liên quan:** [ADR-004](ADR-004-state-management.md) (TanStack Query v5 + Zustand — **giữ nguyên**), [docs/frontend/architecture.md](../frontend/architecture.md) (blueprint hiện thực), BE-1 (public reads anonymous-readable).
 
+> **Cập nhật (2026-06-01):** major hiện hành là **Next.js 16.2.6** (nâng từ 15 ở PR #54, kèm next-intl 4 + ESLint 9 flat config) — chi tiết transition xem [migrations/next-16.md](../frontend/migrations/next-16.md). Quyết định gốc bên dưới ("dùng Next.js App Router + React 19 thay React+Vite SPA") **không đổi**; "15" trong tiêu đề/thân ADR giữ nguyên làm mốc lịch sử của quyết định.
+
 ---
 
 ## Context

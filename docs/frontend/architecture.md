@@ -7,7 +7,7 @@
 
 > **Quy ước ngôn ngữ:** Văn xuôi/giải thích bằng tiếng Việt. Định danh kỹ thuật (component, route, type, biến môi trường, design token) giữ tiếng Anh.
 >
-> **Quyết định framework — ghi nhận tại [ADR-014](../adr/ADR-014-frontend-framework.md):** **Next.js 15 (App Router) + React 19 + TypeScript strict**, thay thế phần SPA React 18 + Vite 5 của ADR-001. Vẫn React/TS, thêm Server Components cho nội dung công khai (SEO Điều 5a) và streaming. Quyết định server-state của **ADR-004 (TanStack Query v5 + Zustand) được giữ nguyên** và áp dụng nguyên vẹn ở lớp client.
+> **Quyết định framework — ghi nhận tại [ADR-014](../adr/ADR-014-frontend-framework.md):** **Next.js 16 (App Router) + React 19 + TypeScript strict**, thay thế phần SPA React 18 + Vite 5 của ADR-001. Vẫn React/TS, thêm Server Components cho nội dung công khai (SEO Điều 5a) và streaming. Quyết định server-state của **ADR-004 (TanStack Query v5 + Zustand) được giữ nguyên** và áp dụng nguyên vẹn ở lớp client.
 
 ---
 

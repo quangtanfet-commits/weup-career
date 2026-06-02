@@ -35,7 +35,7 @@
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.0 (async), Alembic, Pydantic v2 |
 | Database | SQLite 3.45 (MVP) → PostgreSQL (production); trường nhạy cảm mã hóa (Field Crypto) |
 | Auth | JWT (HS256) + httpOnly refresh cookies, bcrypt; Consent Guard + RBAC quan hệ |
-| Frontend | Next.js 15 (App Router), React 19, TypeScript 5 (strict) — xem [ADR-014](docs/adr/ADR-014-frontend-framework.md) |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript 5 (strict) — xem [ADR-014](docs/adr/ADR-014-frontend-framework.md) |
 | State | TanStack Query v5 (server) + Zustand (client) |
 | UI | Tailwind CSS, shadcn/ui (Radix), Framer Motion, Recharts (biểu đồ tiến bộ) |
 | Proxy | Nginx (TLS, rate limiting, reverse-proxy tới Next.js runtime) |
@@ -99,7 +99,7 @@ weup-career/
 │   │   └── core/               # config, db, consent, authz, audit, crypto, logging
 │   ├── migrations/             # Alembic
 │   └── tests/                  # pytest unit + integration
-├── frontend/                   # Next.js 15 App Router (features: auth, guardian, assessment,
+├── frontend/                   # Next.js 16 App Router (features: auth, guardian, assessment,
 │   │                           #   competency, careers, reco, wellbeing, counseling)
 │   └── e2e/                    # Playwright
 ├── nginx/                      # Nginx config
@@ -159,7 +159,7 @@ trivy image weup-career-backend:latest
 | [ADR-011](docs/adr/ADR-011-sensitive-data.md) | **Mã hóa + audit dữ liệu nhạy cảm (CP-3)** |
 | [ADR-012](docs/adr/ADR-012-ai-recommendation-governance.md) | **AI governance: human-in-the-loop, bias (CP-5/6)** |
 | [ADR-013](docs/adr/ADR-013-two-axis-competency-model.md) | **Mô hình năng lực 2 trục K-A-R × giai đoạn** |
-| [ADR-014](docs/adr/ADR-014-frontend-framework.md) | **Next.js 15 App Router + React 19 (thay React 18 + Vite SPA)** |
+| [ADR-014](docs/adr/ADR-014-frontend-framework.md) | **Next.js 16 App Router + React 19 (thay React 18 + Vite SPA)** |
 
 ---
 

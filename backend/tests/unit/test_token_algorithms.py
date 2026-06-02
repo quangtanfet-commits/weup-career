@@ -74,7 +74,7 @@ def test_algorithm_substitution_rejected() -> None:
     s = make_settings()
     header = _b64url({"alg": "HS512", "typ": "JWT"})
     payload = _b64url({"sub": "usr_1", "iss": s.jwt_issuer, "exp": 9999999999})
-    # Signature is irrelevant: HS512 is not in algorithms=[HS256], so jose
+    # Signature is irrelevant: HS512 is not in algorithms=[HS256], so PyJWT
     # refuses before signature comparison.
     forged = f"{header}.{payload}.{_b64url({'x': 'sig'})}"
     with pytest.raises(TokenError):

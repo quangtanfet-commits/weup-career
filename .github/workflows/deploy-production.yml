@@ -34,7 +34,7 @@ jobs:
         run: echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
 
       - name: Deploy to production server
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -76,7 +76,7 @@ jobs:
           echo "✅ Production smoke tests passed"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: "Release ${{ steps.version.outputs.version }}"
           body: |

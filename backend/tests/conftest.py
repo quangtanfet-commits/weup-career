@@ -4,16 +4,21 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from datetime import date
+from typing import cast
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 import pytest_asyncio
+from app.api.deps import mailer as mailer_dep
 from app.core.audit import SqlAuditRepo
 from app.core.config import Settings
 from app.core.database import Base, Database
+from app.core.mailer import CapturingMailer
 from app.main import create_app
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from starlette.applications import Starlette
 
 
 def make_settings(**overrides: object) -> Settings:
@@ -193,10 +198,28 @@ async def grant_content_editor(db: Database, *, user_id: str) -> None:
         await s.commit()
 
 
+@pytest.fixture
+def mailer() -> CapturingMailer:
+    """The test mailer the ``client`` app captures verification links into.
+
+    A single shared instance per test so ``register_and_verify`` can pull the
+    token straight back out of the captured link (N-3 §6.1).
+    """
+    return CapturingMailer()
+
+
 @pytest_asyncio.fixture
-async def client(settings: Settings, db: Database) -> AsyncGenerator[AsyncClient, None]:
+async def client(
+    settings: Settings, db: Database, mailer: CapturingMailer
+) -> AsyncGenerator[AsyncClient, None]:
     app = create_app(settings)
     app.state.db = db
+    # N-3: no real SMTP in tests — capture verification mail in-memory so the
+    # token can be replayed through /auth/verify-email (see register_and_verify).
+    # Also parked on app.state so mailer_of(client) can recover it for the legacy
+    # per-suite _register helpers without threading the fixture through every call.
+    app.state.captured_mailer = mailer
+    app.dependency_overrides[mailer_dep] = lambda: mailer
     transport = ASGITransport(app=app)
     async with LifespanManager(app):
         # Re-attach our test DB (lifespan creates its own otherwise).
@@ -228,3 +251,53 @@ def register_payload(
 def child_dob(years: int = 12) -> str:
     today = date.today()
     return date(today.year - years, today.month, max(1, today.day - 1)).isoformat()
+
+
+async def register_and_verify(
+    client: AsyncClient,
+    mailer: CapturingMailer,
+    **kw: str,
+) -> dict[str, str]:
+    """Register (202) → pull the token from the captured mail → verify (204) → login.
+
+    The single shared seam for the ~dozen suites that used to ``POST /register``
+    and expect an immediate session. N-3 made register enumeration-safe (always
+    202, no session) and gated login on a verified email, so every such suite now
+    routes through here (email-verification §6.1). Returns the login TokenResponse
+    body (``access_token`` + ``user``), matching the old ``_register`` contract.
+    """
+    payload = register_payload(**kw)
+    email = payload["email"].strip().lower()
+
+    resp = await client.post("/api/v1/auth/register", json=payload)
+    assert resp.status_code == 202, resp.text
+
+    sent = mailer.last_for(email)
+    assert sent is not None, f"no verification email captured for {email}"
+    token = parse_qs(urlsplit(sent.verify_url).query)["token"][0]
+
+    verify = await client.post("/api/v1/auth/verify-email", json={"token": token})
+    assert verify.status_code == 204, verify.text
+
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": payload["password"]},
+    )
+    assert login.status_code == 200, login.text
+    return login.json()
+
+
+def mailer_of(client: AsyncClient) -> CapturingMailer:
+    """Recover the CapturingMailer the ``client`` app captures into.
+
+    The app and the test share one instance via ``app.state`` (set in the
+    ``client`` fixture), so the legacy per-suite ``_register`` helpers can
+    delegate to ``register_and_verify`` without threading the ``mailer`` fixture
+    through ~60 call sites.
+    """
+    transport = client._transport
+    assert isinstance(transport, ASGITransport)
+    app = cast(Starlette, transport.app)
+    mailer = app.state.captured_mailer
+    assert isinstance(mailer, CapturingMailer)
+    return mailer

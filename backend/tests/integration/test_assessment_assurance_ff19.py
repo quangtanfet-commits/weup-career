@@ -14,13 +14,20 @@ from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
+from app.api.deps import mailer as mailer_dep
 from app.core.config import Settings
 from app.core.database import Database
+from app.core.mailer import CapturingMailer
 from app.main import create_app
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
-from tests.conftest import child_dob, make_settings, register_payload
+from tests.conftest import (
+    child_dob,
+    mailer_of,
+    make_settings,
+    register_and_verify,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -37,30 +44,19 @@ async def medium_settings() -> Settings:
 
 
 async def _make_child_with_low_consent(client: AsyncClient) -> str:
-    await client.post(
-        "/api/v1/auth/register",
-        json=register_payload(
+    mailer = mailer_of(client)
+    child_token = (
+        await register_and_verify(
+            client,
+            mailer,
             email="child@example.com",
             dob=child_dob(12),
             school_level="lower_secondary",
-        ),
-    )
-    await client.post(
-        "/api/v1/auth/register",
-        json=register_payload(email="parent@example.com", dob="1980-01-01"),
-    )
-    child_token = (
-        await client.post(
-            "/api/v1/auth/login",
-            json={"email": "child@example.com", "password": "Password123"},
         )
-    ).json()["access_token"]
+    )["access_token"]
     guardian_token = (
-        await client.post(
-            "/api/v1/auth/login",
-            json={"email": "parent@example.com", "password": "Password123"},
-        )
-    ).json()["access_token"]
+        await register_and_verify(client, mailer, email="parent@example.com", dob="1980-01-01")
+    )["access_token"]
     invite = await client.post(
         "/api/v1/guardians/invite",
         json={"guardian_email": "parent@example.com", "relationship": "mother"},
@@ -87,6 +83,11 @@ async def medium_client(
 ) -> AsyncGenerator[AsyncClient, None]:
     app = create_app(medium_settings)
     app.state.db = db
+    # N-3: capture verification mail so register_and_verify can replay the token
+    # (mirrors the shared ``client`` fixture wiring in conftest).
+    mailer = CapturingMailer()
+    app.state.captured_mailer = mailer
+    app.dependency_overrides[mailer_dep] = lambda: mailer
     transport = ASGITransport(app=app)
     async with LifespanManager(app):
         app.state.db = db
@@ -110,16 +111,11 @@ async def test_low_assurance_blocked_at_medium_minimum(
 async def test_adult_not_assurance_gated_at_medium_minimum(
     medium_client: AsyncClient,
 ) -> None:
-    await medium_client.post(
-        "/api/v1/auth/register",
-        json=register_payload(email="adult@example.com", dob="1990-01-01"),
-    )
     token = (
-        await medium_client.post(
-            "/api/v1/auth/login",
-            json={"email": "adult@example.com", "password": "Password123"},
+        await register_and_verify(
+            medium_client, mailer_of(medium_client), email="adult@example.com", dob="1990-01-01"
         )
-    ).json()["access_token"]
+    )["access_token"]
     resp = await medium_client.post(
         "/api/v1/assessments/riasec/submit",
         json={"answers": _ANSWERS},

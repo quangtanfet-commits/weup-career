@@ -18,7 +18,12 @@ from app.account.repository import SqlAccountRepo
 from app.account.service import AccountService
 from app.assessments.repository import SqlAssessmentRepo
 from app.assessments.service import AssessmentService
-from app.auth.repository import SqlRefreshTokenRepo, SqlRevokedTokenRepo, SqlUserRepo
+from app.auth.repository import (
+    SqlEmailVerificationTokenRepo,
+    SqlRefreshTokenRepo,
+    SqlRevokedTokenRepo,
+    SqlUserRepo,
+)
 from app.auth.service import AuthService
 from app.careers.repository import SqlCareerRepo
 from app.careers.service import CareerService
@@ -30,6 +35,7 @@ from app.core.consent import require_consent
 from app.core.crypto import FieldCrypto
 from app.core.database import Database
 from app.core.exceptions import AuthenticationError, PermissionDeniedError
+from app.core.mailer import ConsoleMailer, IMailer, SmtpMailer
 from app.core.security import decode_access_token
 from app.guardians.repository import SqlGuardianRepo
 from app.guardians.service import GuardianService
@@ -94,6 +100,12 @@ def revoked_token_repo(
     return SqlRevokedTokenRepo(session)
 
 
+def email_verification_repo(
+    session: AsyncSession = Depends(get_session),
+) -> SqlEmailVerificationTokenRepo:
+    return SqlEmailVerificationTokenRepo(session)
+
+
 def guardian_repo(session: AsyncSession = Depends(get_session)) -> SqlGuardianRepo:
     return SqlGuardianRepo(session)
 
@@ -134,6 +146,15 @@ def field_crypto(settings: Settings = Depends(settings_dep)) -> FieldCrypto:
     return FieldCrypto(settings.field_encryption_key)
 
 
+def mailer(settings: Settings = Depends(settings_dep)) -> IMailer:
+    # No real SMTP ships in the MVP (N-3 §8): dev/test log or capture the link,
+    # production fail-fasts rather than silently dropping verification mail or
+    # leaking the token to logs. Tests override this with a CapturingMailer.
+    if settings.is_production:
+        return SmtpMailer()
+    return ConsoleMailer()
+
+
 # -- services -------------------------------------------------------------
 
 
@@ -142,9 +163,19 @@ def auth_service(
     users: SqlUserRepo = Depends(user_repo),
     tokens: SqlRefreshTokenRepo = Depends(token_repo),
     revoked: SqlRevokedTokenRepo = Depends(revoked_token_repo),
+    email_tokens: SqlEmailVerificationTokenRepo = Depends(email_verification_repo),
+    mailer_: IMailer = Depends(mailer),
     audit: SqlAuditRepo = Depends(audit_repo),
 ) -> AuthService:
-    return AuthService(settings=settings, users=users, tokens=tokens, revoked=revoked, audit=audit)
+    return AuthService(
+        settings=settings,
+        users=users,
+        tokens=tokens,
+        revoked=revoked,
+        email_tokens=email_tokens,
+        mailer=mailer_,
+        audit=audit,
+    )
 
 
 def guardian_service(

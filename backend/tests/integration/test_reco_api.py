@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import child_dob, register_payload
+from tests.conftest import child_dob, mailer_of, register_and_verify
 
 pytestmark = pytest.mark.asyncio
 
@@ -17,9 +17,9 @@ _RIASEC_ANSWERS = {"I_1": 5, "I_2": 5, "R_1": 4, "A_1": 1, "S_1": 1, "E_1": 1, "
 
 
 async def _register(client: AsyncClient, **kw: str) -> dict[str, str]:
-    resp = await client.post("/api/v1/auth/register", json=register_payload(**kw))
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    # ``register_and_verify`` returns the login TokenResponse (``access_token`` +
+    # ``user``); these helpers only need the user record (``id``), so unwrap.
+    return (await register_and_verify(client, mailer_of(client), **kw))["user"]
 
 
 async def _token(client: AsyncClient, email: str, password: str = "Password123") -> str:

@@ -83,6 +83,16 @@ class Settings(BaseSettings):
     rate_limit_refresh_window_seconds: int = 60
     rate_limit_api_max: int = 200
     rate_limit_api_window_seconds: int = 60
+    # Resend-verification bucket (N-3). Tighter than register: the email is the
+    # only input and each hit sends mail, so cap re-requests per address/window.
+    rate_limit_resend_verification_max: int = 3
+    rate_limit_resend_verification_window_seconds: int = 3600
+
+    # Email verification (N-3, PT-04 residual). The verification link points at
+    # the frontend, which POSTs the token back to /auth/verify-email. TTL bounds
+    # how long a single-use token stays valid.
+    frontend_base_url: str = "http://localhost:3000"
+    verification_token_ttl_hours: int = 24
 
     @field_validator("secret_key", "field_encryption_key", mode="before")
     @classmethod

@@ -38,6 +38,14 @@ class User(UUIDMixin, TimestampMixin, Base):
     )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Email-ownership proof (N-3, PT-04 residual). Orthogonal to ``account_status``
+    # (lifecycle) and ``is_deleted`` — an under-16 user can be email-verified yet
+    # still PENDING_GUARDIAN_CONSENT. NULL = unproven; login is gated on this being
+    # set (post-credential, so it is never an enumeration oracle). Existing rows
+    # backfill to ``created_at`` in the migration to avoid mass lockout.
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # Global/internal content-editor capability (spec §2 "Nội bộ", FR-90). NOT
     # school-scoped: a content_editor manages the versioned public content
     # library system-wide. Minimal, auditable flag (default off) rather than a
@@ -82,4 +90,24 @@ class RevokedAccessToken(UUIDMixin, Base):
         String(36), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class EmailVerificationToken(UUIDMixin, Base):
+    """Single-use email-verification token (N-3, PT-04 residual).
+
+    Hash-only at rest (mirrors ``RefreshToken``): the raw token travels only in
+    the verification link, and only its SHA-256 hash is persisted, so a DB read
+    cannot forge a verification. A row is consumed exactly once (``consumed_at``
+    set on success) and is otherwise valid until ``expires_at``.
+    """
+
+    __tablename__ = "email_verification_token"
+
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

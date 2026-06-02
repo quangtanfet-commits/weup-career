@@ -51,6 +51,16 @@ class TokenError(AuthenticationError):
     message = "Token không hợp lệ hoặc đã hết hạn"
 
 
+class EmailNotVerifiedError(AppError):
+    """N-3: login is gated on proven email ownership, but only AFTER the password
+    check passes — so this is never a pre-auth enumeration oracle (spec §2.2/§5).
+    """
+
+    status_code = 403
+    code = "EMAIL_NOT_VERIFIED"
+    message = "Email chưa được xác minh. Vui lòng kiểm tra hộp thư để xác minh tài khoản."
+
+
 class PermissionDeniedError(AppError):
     status_code = 403
     code = "PERMISSION_DENIED"

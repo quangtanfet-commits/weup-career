@@ -11,7 +11,12 @@ from typing import Protocol
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import RefreshToken, RevokedAccessToken, User
+from app.auth.models import (
+    EmailVerificationToken,
+    RefreshToken,
+    RevokedAccessToken,
+    User,
+)
 from app.core.models import new_uuid, utcnow
 
 
@@ -33,6 +38,15 @@ class IRefreshTokenRepo(Protocol):
 class IRevokedTokenRepo(Protocol):
     async def add(self, *, jti: str, user_id: str, expires_at: datetime) -> None: ...
     async def is_revoked(self, jti: str, *, now: datetime) -> bool: ...
+
+
+class IEmailVerificationTokenRepo(Protocol):
+    async def add(
+        self, *, user_id: str, token_hash: str, expires_at: datetime, created_at: datetime
+    ) -> None: ...
+    async def get_by_hash(self, token_hash: str) -> EmailVerificationToken | None: ...
+    async def consume(self, token: EmailVerificationToken, *, when: datetime) -> None: ...
+    async def invalidate_unconsumed_for_user(self, user_id: str, *, when: datetime) -> int: ...
 
 
 class SqlUserRepo:
@@ -138,3 +152,49 @@ class SqlRevokedTokenRepo:
             )
         )
         return result.scalar_one_or_none() is not None
+
+
+class SqlEmailVerificationTokenRepo:
+    """Single-use email-verification tokens, hash-only at rest (N-3)."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(
+        self, *, user_id: str, token_hash: str, expires_at: datetime, created_at: datetime
+    ) -> None:
+        self._session.add(
+            EmailVerificationToken(
+                id=new_uuid(),
+                user_id=user_id,
+                token_hash=token_hash,
+                expires_at=expires_at,
+                created_at=created_at,
+            )
+        )
+        await self._session.flush()
+
+    async def get_by_hash(self, token_hash: str) -> EmailVerificationToken | None:
+        result = await self._session.execute(
+            select(EmailVerificationToken).where(EmailVerificationToken.token_hash == token_hash)
+        )
+        return result.scalar_one_or_none()
+
+    async def consume(self, token: EmailVerificationToken, *, when: datetime) -> None:
+        token.consumed_at = when
+        await self._session.flush()
+
+    async def invalidate_unconsumed_for_user(self, user_id: str, *, when: datetime) -> int:
+        # On resend, retire any still-open token for the user so only the newest
+        # link works — bounds how many live single-use tokens exist per account.
+        result = await self._session.execute(
+            select(EmailVerificationToken).where(
+                EmailVerificationToken.user_id == user_id,
+                EmailVerificationToken.consumed_at.is_(None),
+            )
+        )
+        tokens = list(result.scalars().all())
+        for token in tokens:
+            token.consumed_at = when
+        await self._session.flush()
+        return len(tokens)

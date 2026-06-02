@@ -50,8 +50,8 @@ hand-started backend.
   creates the DB fresh. A failed migration is recorded as an `e2e-db` failure.
 - **Backend command:** `uv run uvicorn app.main:get_app --factory --port 8000`,
   launched under `setsid` (see Teardown), cwd `backend/`. The ASGI entrypoint is
-  the **factory** `get_app()` — `app.main:app` does not exist (the README is
-  stale). Default `environment=development` ⇒ non-prod ⇒ `FileMailer` chosen
+  the **factory** `get_app()` — `app.main:app` does not exist. Default
+  `environment=development` ⇒ non-prod ⇒ `FileMailer` chosen
   when the outbox env is set. No `--reload` (clean single process).
 - **Rate limiting off (test-env config):** the backend is booted with
   `RATE_LIMIT_ENABLED=false` (scoped to the setsid process). The 3-browser

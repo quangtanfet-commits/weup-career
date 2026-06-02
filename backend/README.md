@@ -15,7 +15,7 @@ never import FastAPI; repositories are Protocol ports with SQLAlchemy adapters.
 uv sync                       # install deps
 cp .env.example .env          # fill SECRET_KEY + FIELD_ENCRYPTION_KEY
 uv run alembic upgrade head   # create schema
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:get_app --factory --reload
 ```
 Open http://localhost:8000/api/v1/docs
 

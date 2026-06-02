@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
 
 from app.core.config import Settings
 from app.core.exceptions import TokenError
@@ -86,7 +86,7 @@ def decode_access_token(token: str, *, settings: Settings) -> dict[str, Any]:
             issuer=settings.jwt_issuer,
             options={"require": ["exp", "sub", "iss"]},
         )
-    except JWTError as exc:
+    except jwt.PyJWTError as exc:
         raise TokenError() from exc
     return claims
 

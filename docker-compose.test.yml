@@ -37,6 +37,19 @@ services:
       # is already covered deterministically by the backend integration tests
       # (tests/integration/test_http_hardening.py), so E2E need not exercise it.
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-false}
+      # N-3 email verification: select FileMailer (deps.py) instead of
+      # ConsoleMailer so register/resend write the verify token to an outbox the
+      # host Playwright fixtures can read. The path lives on the /shared bind
+      # mount below; the CI runner points its own WEUP_MAILER_OUTBOX at the same
+      # host dir (./.e2e-outbox), so backend (in-container) and Playwright
+      # (on the host) resolve to the SAME file across the two filesystems.
+      # See docs/testing/ci-e2e-mailer-outbox-fix-2026-06.md.
+      WEUP_MAILER_OUTBOX: /shared/outbox.ndjson
+    volumes:
+      # Bind mount, not a named volume — the host Playwright step must read this
+      # path directly. The runner creates ./.e2e-outbox (chmod 777) before
+      # `up` because the container runs as non-root `appuser`.
+      - ./.e2e-outbox:/shared
     # No host port needed — nginx reaches it on the internal network. (The base
     # publishes 8000 for dev convenience; that is harmless here.)
 

@@ -454,6 +454,11 @@ jobs:
           FIELD_ENCRYPTION_KEY: ci-e2e-test-field-encryption-key-not-for-production
           ENVIRONMENT: test
         run: |
+          # Shared mailer outbox: the backend (non-root appuser, in-container)
+          # writes the N-3 verify token here; the host Playwright step reads the
+          # same file via the bind mount. chmod 777 so appuser can create it.
+          # See docs/testing/ci-e2e-mailer-outbox-fix-2026-06.md.
+          mkdir -p .e2e-outbox && chmod 777 .e2e-outbox
           docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build
           # Wait for health
           timeout 60 bash -c 'until curl -sf http://localhost/api/v1/ready; do sleep 2; done'
@@ -462,6 +467,10 @@ jobs:
         working-directory: frontend
         env:
           BASE_URL: http://localhost
+          # Same host file the compose backend writes to via /shared. The
+          # fixtures honor this env (tests/e2e/fixtures/auth.ts); without it
+          # they default to /tmp/weup-outbox.ndjson and never see the token.
+          WEUP_MAILER_OUTBOX: ${{ github.workspace }}/.e2e-outbox/outbox.ndjson
         run: npx playwright test --project=${{ matrix.browser }} --reporter=html
 
       - name: Dump Docker stack logs on failure
@@ -478,6 +487,7 @@ jobs:
           path: |
             frontend/playwright-report/
             frontend/test-results/
+            .e2e-outbox/outbox.ndjson
           retention-days: 7
 
       - name: Stop Docker stack

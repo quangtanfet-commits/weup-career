@@ -176,9 +176,7 @@ class SqlEmailVerificationTokenRepo:
 
     async def get_by_hash(self, token_hash: str) -> EmailVerificationToken | None:
         result = await self._session.execute(
-            select(EmailVerificationToken).where(
-                EmailVerificationToken.token_hash == token_hash
-            )
+            select(EmailVerificationToken).where(EmailVerificationToken.token_hash == token_hash)
         )
         return result.scalar_one_or_none()
 

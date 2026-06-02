@@ -55,9 +55,7 @@ async def _make_child_with_low_consent(client: AsyncClient) -> str:
         )
     )["access_token"]
     guardian_token = (
-        await register_and_verify(
-            client, mailer, email="parent@example.com", dob="1980-01-01"
-        )
+        await register_and_verify(client, mailer, email="parent@example.com", dob="1980-01-01")
     )["access_token"]
     invite = await client.post(
         "/api/v1/guardians/invite",

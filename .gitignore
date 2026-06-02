@@ -26,6 +26,9 @@ docs/temp/
 # Generated validation/security/report artifacts (regenerated from CI)
 report/
 
+# E2E mailer outbox bind-mount target (created by the CI e2e job, ephemeral)
+.e2e-outbox/
+
 # Authorized pentest engagement evidence — never commit (forged tokens, captures)
 .pentest/
 

@@ -273,7 +273,7 @@ omit = ["*/tests/*","*/migrations/*","app/main.py"]
 [tool.coverage.report]
 fail_under = 95
 ```
-**100% branch bắt buộc:** `app/core/consent.py`, `app/core/authz.py`, `app/core/audit.py`, `app/core/crypto.py`, `app/auth/service.py`, `app/guardians/service.py`, `app/assessments/service.py`, `app/reco/service.py`.
+**100% line+branch bắt buộc (lớp tới hạn NFR-19) — enforce bằng CI gate riêng:** toàn package `app/auth/*`, `app/guardians/*`, `app/assessments/*`, `app/reco/*` + `app/core/{consent,crypto,security,audit,authz,ratelimit}.py`. Gate này độc lập với cổng toàn cục 95% và **chặn merge** nếu bất kỳ dòng/nhánh nào trong tập trên hở. Cơ chế + lý do phạm vi: xem [coverage-critical-layers-n2.md](./coverage-critical-layers-n2.md).
 
 ### Frontend (Vitest)
 ```typescript
@@ -285,7 +285,8 @@ coverage: { provider: 'v8', thresholds: { lines: 95, branches: 90, functions: 95
 
 ## CI Quality Gate Summary
 ```yaml
-backend_coverage:  >= 95%   # 100% trên consent/sensitive/auth/reco
+backend_coverage:  >= 95%   # cổng toàn cục
+backend_critical_coverage: == 100%  # gate riêng: auth/consent/sensitive/reco + authz/ratelimit (coverage-critical-layers-n2.md)
 frontend_coverage: >= 95%
 type_errors: 0              # mypy --strict && tsc --noEmit
 lint_errors: 0

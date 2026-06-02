@@ -8,7 +8,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/composites/FormField";
-import { createSupportRequest } from "@/lib/api/endpoints/wellbeing";
+import { useCreateSupportRequest } from "@/features/wellbeing/useWellbeing";
 import { ApiError } from "@/lib/api/errors";
 import {
   supportRequestSchema,
@@ -27,10 +27,13 @@ import {
  * confirms the request was routed and reassures the learner a counselor will
  * reach out.
  *
- * `onCreated` lets the parent page refresh the list of the learner's requests.
+ * On success the create mutation invalidates the support-requests query so the
+ * learner's list re-reads the new request (architecture.md §5.4) — no parent
+ * refresh coordination needed.
  */
-export function SupportRequestForm({ onCreated }: { onCreated?: () => void }) {
+export function SupportRequestForm() {
   const t = useTranslations("wellbeing");
+  const createMutation = useCreateSupportRequest();
   const [status, setStatus] = useState<"idle" | "sent">("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -47,10 +50,9 @@ export function SupportRequestForm({ onCreated }: { onCreated?: () => void }) {
   const onSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
     try {
-      await createSupportRequest(toSupportRequestPayload(values));
+      await createMutation.mutateAsync(toSupportRequestPayload(values));
       setStatus("sent");
       reset();
-      onCreated?.();
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : t("genericError"));
     }

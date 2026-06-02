@@ -1,13 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
-import {
-  listSupportRequests,
-  type SupportRequestOut,
-  type SupportRequestStatus,
-} from "@/lib/api/endpoints/wellbeing";
+import { useSupportRequests } from "@/features/wellbeing/useWellbeing";
+import { type SupportRequestStatus } from "@/lib/api/endpoints/wellbeing";
 import { ApiError } from "@/lib/api/errors";
 
 const STATUS_TOKENS: Record<SupportRequestStatus, string> = {
@@ -24,46 +20,24 @@ const STATUS_TOKENS: Record<SupportRequestStatus, string> = {
  * counselor, never any health/risk state (NG-03, no diagnosis). The status is
  * conveyed with text (not colour alone) for a11y (architecture.md §8).
  *
- * Re-fetches whenever `refreshKey` changes so the parent page can refresh the
- * list after a new request is created. Fetches on the client with the in-memory
- * bearer token (no caching of personal data into the RSC layer).
+ * Reads through TanStack Query (ADR-004); the create mutation invalidates the
+ * list key so a new request appears without the parent coordinating a refresh.
+ * Fetches on the client with the in-memory bearer token (no caching of personal
+ * data into the RSC layer).
  */
-export function SupportRequestList({
-  refreshKey = 0,
-}: {
-  refreshKey?: number;
-}) {
+export function SupportRequestList() {
   const t = useTranslations("wellbeing");
-  const [items, setItems] = useState<SupportRequestOut[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isPending, isError, error } = useSupportRequests();
 
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      setItems(await listSupportRequests());
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("genericError"));
-    }
-  }, [t]);
-
-  useEffect(() => {
-    // Client fetch-on-mount/refresh: `load` resets error state synchronously
-    // then setState after an awaited fetch. This is the data-load pattern that
-    // react-query (already a dep) would replace; migrating these feature reads
-    // is tracked separately, out of scope for the Next 16 bump.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-  }, [load, refreshKey]);
-
-  if (error) {
+  if (isError) {
     return (
       <p role="alert" className="text-sm text-danger-600">
-        {error}
+        {error instanceof ApiError ? error.message : t("genericError")}
       </p>
     );
   }
 
-  if (items === null) {
+  if (isPending) {
     return (
       <p role="status" className="text-sm text-ink-600">
         {t("listLoading")}
@@ -71,7 +45,7 @@ export function SupportRequestList({
     );
   }
 
-  if (items.length === 0) {
+  if (data.length === 0) {
     return <p className="text-sm text-ink-600">{t("listEmpty")}</p>;
   }
 
@@ -82,7 +56,7 @@ export function SupportRequestList({
 
   return (
     <ul className="flex flex-col gap-3">
-      {items.map((item) => (
+      {data.map((item) => (
         <li
           key={item.id}
           className="flex flex-col gap-1.5 rounded-md border border-input p-4"

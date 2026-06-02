@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
 
-const listSupportRequests = vi.fn();
-vi.mock("@/lib/api/endpoints/wellbeing", () => ({
-  listSupportRequests: (...args: unknown[]) => listSupportRequests(...args),
+const useSupportRequestsMock = vi.fn();
+vi.mock("@/features/wellbeing/useWellbeing", () => ({
+  useSupportRequests: () => useSupportRequestsMock(),
 }));
 
 import { SupportRequestList } from "@/features/wellbeing/SupportRequestList";
@@ -17,42 +17,63 @@ const base = {
 };
 
 describe("SupportRequestList", () => {
-  beforeEach(() => {
-    listSupportRequests.mockReset();
-  });
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("shows the empty state when the learner has no requests", async () => {
-    listSupportRequests.mockResolvedValue([]);
+  it("shows the loading state while the query is pending", () => {
+    useSupportRequestsMock.mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isError: false,
+      error: null,
+    });
     renderWithIntl(<SupportRequestList />);
 
     expect(
-      await screen.findByText(viMessages.wellbeing.listEmpty),
+      screen.getByText(viMessages.wellbeing.listLoading),
     ).toBeInTheDocument();
   });
 
-  it("renders requests with their routing status (text, not colour alone)", async () => {
-    listSupportRequests.mockResolvedValue([
-      {
-        ...base,
-        id: "sr1",
-        message: "Em muốn được hỗ trợ.",
-        status: "open",
-        created_at: "2026-05-30T08:00:00Z",
-      },
-      {
-        ...base,
-        id: "sr2",
-        message: "Cảm ơn ạ.",
-        status: "acknowledged",
-        created_at: "2026-05-29T08:00:00Z",
-      },
-    ]);
+  it("shows the empty state when the learner has no requests", () => {
+    useSupportRequestsMock.mockReturnValue({
+      data: [],
+      isPending: false,
+      isError: false,
+      error: null,
+    });
     renderWithIntl(<SupportRequestList />);
 
-    expect(await screen.findByText("Em muốn được hỗ trợ.")).toBeInTheDocument();
+    expect(
+      screen.getByText(viMessages.wellbeing.listEmpty),
+    ).toBeInTheDocument();
+  });
+
+  it("renders requests with their routing status (text, not colour alone)", () => {
+    useSupportRequestsMock.mockReturnValue({
+      data: [
+        {
+          ...base,
+          id: "sr1",
+          message: "Em muốn được hỗ trợ.",
+          status: "open",
+          created_at: "2026-05-30T08:00:00Z",
+        },
+        {
+          ...base,
+          id: "sr2",
+          message: "Cảm ơn ạ.",
+          status: "acknowledged",
+          created_at: "2026-05-29T08:00:00Z",
+        },
+      ],
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderWithIntl(<SupportRequestList />);
+
+    expect(screen.getByText("Em muốn được hỗ trợ.")).toBeInTheDocument();
     expect(
       screen.getByText(viMessages.wellbeing.status.open),
     ).toBeInTheDocument();
@@ -61,14 +82,15 @@ describe("SupportRequestList", () => {
     ).toBeInTheDocument();
   });
 
-  it("surfaces a backend error message on failure", async () => {
-    listSupportRequests.mockRejectedValue(
-      new ApiError(401, "Phiên đăng nhập đã hết hạn", "UNAUTHORIZED"),
-    );
+  it("surfaces a backend error message on failure", () => {
+    useSupportRequestsMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new ApiError(401, "Phiên đăng nhập đã hết hạn", "UNAUTHORIZED"),
+    });
     renderWithIntl(<SupportRequestList />);
 
-    expect(
-      await screen.findByText("Phiên đăng nhập đã hết hạn"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Phiên đăng nhập đã hết hạn")).toBeInTheDocument();
   });
 });

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useTranslations } from "next-intl";
 
 import {
@@ -25,12 +24,11 @@ import { SupportRequestList } from "@/features/wellbeing/SupportRequestList";
  *
  * The page is deliberately **non-clinical** (NG-03): it offers stress/balance
  * guidance and a safe path to a human counselor (Tier 3); it never diagnoses or
- * implies a medical assessment. A local `refreshKey` re-loads the request list
- * after a new request is created.
+ * implies a medical assessment. Creating a request invalidates the
+ * support-requests query so the list below re-loads on its own.
  */
 export default function WellbeingPage() {
   const t = useTranslations("wellbeing");
-  const [refreshKey, setRefreshKey] = useState(0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -55,7 +53,7 @@ export default function WellbeingPage() {
             <CardDescription>{t("requestDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <SupportRequestForm onCreated={() => setRefreshKey((k) => k + 1)} />
+            <SupportRequestForm />
           </CardContent>
         </Card>
 
@@ -65,7 +63,7 @@ export default function WellbeingPage() {
             <CardDescription>{t("listDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <SupportRequestList refreshKey={refreshKey} />
+            <SupportRequestList />
           </CardContent>
         </Card>
       </ConsentGateBanner>

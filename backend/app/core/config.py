@@ -36,6 +36,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        populate_by_name=True,
     )
 
     environment: Environment = "development"
@@ -93,6 +94,13 @@ class Settings(BaseSettings):
     # how long a single-use token stays valid.
     frontend_base_url: str = "http://localhost:3000"
     verification_token_ttl_hours: int = 24
+
+    # E2E test infrastructure (non-prod only). When set in a dev/test environment,
+    # the mailer writes each verification link as NDJSON to this outbox file so an
+    # out-of-process Playwright harness can read the raw token (the in-memory test
+    # mailer is invisible across processes). Ignored in production — SmtpMailer
+    # always wins there. Env: WEUP_MAILER_OUTBOX.
+    mailer_outbox_path: str | None = Field(default=None, alias="WEUP_MAILER_OUTBOX")
 
     @field_validator("secret_key", "field_encryption_key", mode="before")
     @classmethod

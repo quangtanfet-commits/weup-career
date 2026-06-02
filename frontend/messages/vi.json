@@ -59,7 +59,19 @@
     "noAccount": "Chưa có tài khoản?",
     "haveAccount": "Đã có tài khoản?",
     "goRegister": "Đăng ký",
-    "goLogin": "Đăng nhập"
+    "goLogin": "Đăng nhập",
+    "checkEmailTitle": "Kiểm tra hộp thư của bạn",
+    "checkEmailBody": "Chúng tôi đã gửi liên kết xác minh tới {email}. Mở email và nhấp vào liên kết để kích hoạt tài khoản.",
+    "resend": "Gửi lại email xác minh",
+    "resendDone": "Nếu thông tin hợp lệ, chúng tôi đã gửi lại email xác minh.",
+    "verifyTitle": "Xác minh email",
+    "verifying": "Đang xác minh…",
+    "verifySuccessTitle": "Email đã được xác minh",
+    "verifySuccessBody": "Tài khoản của bạn đã sẵn sàng. Vui lòng đăng nhập.",
+    "verifyInvalidTitle": "Liên kết không hợp lệ hoặc đã hết hạn",
+    "verifyInvalidBody": "Liên kết xác minh không còn hiệu lực. Hãy yêu cầu gửi lại một liên kết mới.",
+    "goLoginCta": "Đến trang đăng nhập",
+    "emailNotVerified": "Tài khoản chưa được xác minh email. Vui lòng kiểm tra hộp thư hoặc gửi lại liên kết."
   },
   "consent": {
     "pageTitle": "Đồng ý của người giám hộ",

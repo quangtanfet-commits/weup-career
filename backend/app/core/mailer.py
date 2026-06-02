@@ -10,13 +10,20 @@ Adapters:
 - ``ConsoleMailer`` (development): logs the verification link to stdout.
 - ``CapturingMailer`` (test): records sent mail in-memory so a test can pull the
   token out of the link and POST it back.
+- ``FileMailer`` (e2e, non-prod): appends each sent mail as one NDJSON line to a
+  local outbox file so an OUT-OF-PROCESS harness (Playwright against the running
+  backend) can read the raw token — the in-memory ``CapturingMailer`` is invisible
+  across processes. Never selected in production.
 - ``SmtpMailer`` (production seam): fail-fast placeholder — wiring a real SMTP
   transport is explicitly out of MVP scope (email-verification §8).
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 import structlog
@@ -71,6 +78,30 @@ class CapturingMailer:
             if email.to == to:
                 return email
         return None
+
+
+class FileMailer:
+    """E2E adapter — appends each sent mail as NDJSON to a local outbox file.
+
+    The native Playwright harness drives the SAME backend process the user runs;
+    it cannot see ``CapturingMailer``'s in-memory list (separate process), and the
+    raw token by design only escapes the system via the email link. Writing
+    ``{"to", "verify_url", "ts"}`` one-per-line lets the harness read the newest
+    matching line and pull the token from the URL. Append-only and local-only;
+    selected ONLY in non-production when an outbox path is configured.
+    """
+
+    def __init__(self, path: str) -> None:
+        self._path = Path(path)
+
+    async def send_verification_email(self, *, to: str, verify_url: str) -> None:
+        line = json.dumps(
+            {"to": to, "verify_url": verify_url, "ts": datetime.now(UTC).isoformat()},
+            ensure_ascii=False,
+        )
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        with self._path.open("a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
 
 
 class SmtpMailer:

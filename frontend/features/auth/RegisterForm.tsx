@@ -3,16 +3,21 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { FormField } from "@/components/composites/FormField";
-import { login, register as registerAccount } from "@/lib/api/endpoints/auth";
+import {
+  CheckEmailNotice,
+  type ResendState,
+} from "@/features/auth/CheckEmailNotice";
+import {
+  register as registerAccount,
+  resendVerification,
+} from "@/lib/api/endpoints/auth";
 import { ApiError } from "@/lib/api/errors";
-import { useAuthStore } from "@/lib/auth/store";
 import {
   registerSchema,
   requiresGuardian,
@@ -38,15 +43,16 @@ const USER_TYPE_LABELS: Record<(typeof userTypes)[number], string> = {
 /**
  * Registration form (architecture.md §3, Luồng 1; CP-1). RHF + Zod mirrors the
  * backend rules. When the date of birth implies a child <16, a guardian-consent
- * notice is shown (legal basis: under-16 register via a guardian). On success
- * the user is logged in and routed to `/consent` if the backend marks the
- * account `pending_guardian_consent`, otherwise to the dashboard.
+ * notice is shown (legal basis: under-16 register via a guardian). Register now
+ * returns 202 with no session (email-verification-2026-06.md §3.1): on success
+ * the form is replaced by a "check your email" notice — NO auto-login. Consent
+ * routing moved to the login form (it can only run on a verified session).
  */
 export function RegisterForm() {
   const t = useTranslations("auth");
-  const router = useRouter();
-  const setSessionFromToken = useAuthStore((s) => s.setSessionFromToken);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<ResendState>("idle");
 
   const {
     register,
@@ -76,21 +82,34 @@ export function RegisterForm() {
     setSubmitError(null);
     try {
       await registerAccount(toRegisterPayload(values));
-      // Register returns no token; log in to obtain the session.
-      const res = await login({
-        email: values.email,
-        password: values.password,
-      });
-      setSessionFromToken(res.access_token, res.user);
-      const next =
-        res.user.account_status === "pending_guardian_consent"
-          ? "/consent"
-          : "/dashboard";
-      router.replace(next);
+      // 202 with no session — show the check-email notice, do not log in.
+      setSubmittedEmail(values.email);
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : t("genericError"));
     }
   });
+
+  async function handleResend() {
+    if (!submittedEmail || resendState === "resending") return;
+    setResendState("resending");
+    try {
+      await resendVerification(submittedEmail);
+    } finally {
+      // Always land on the generic "re-sent" notice (enumeration-safe), even if
+      // the backend swallowed an error — resend is best-effort by contract.
+      setResendState("done");
+    }
+  }
+
+  if (submittedEmail) {
+    return (
+      <CheckEmailNotice
+        email={submittedEmail}
+        resendState={resendState}
+        onResend={handleResend}
+      />
+    );
+  }
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">

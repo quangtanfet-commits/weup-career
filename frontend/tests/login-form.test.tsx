@@ -8,8 +8,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 const login = vi.fn();
+const resendVerification = vi.fn();
 vi.mock("@/lib/api/endpoints/auth", () => ({
   login: (...args: unknown[]) => login(...args),
+  resendVerification: (...args: unknown[]) => resendVerification(...args),
 }));
 
 import { LoginForm } from "@/features/auth/LoginForm";
@@ -36,6 +38,7 @@ describe("LoginForm", () => {
   beforeEach(() => {
     replace.mockReset();
     login.mockReset();
+    resendVerification.mockReset();
     useAuthStore.getState().clearSession();
   });
   afterEach(() => {
@@ -119,5 +122,82 @@ describe("LoginForm", () => {
       await screen.findByText("Email hoặc mật khẩu không đúng"),
     ).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the generic error for a non-API failure", async () => {
+    login.mockRejectedValue(new Error("network down"));
+    const user = userEvent.setup();
+    renderWithIntl(<LoginForm />);
+
+    await user.type(screen.getByLabelText(viMessages.auth.email), "a@b.vn");
+    await user.type(
+      screen.getByLabelText(viMessages.auth.password),
+      "abcdef12",
+    );
+    await user.click(
+      screen.getByRole("button", { name: viMessages.auth.loginSubmit }),
+    );
+
+    expect(
+      await screen.findByText(viMessages.auth.genericError),
+    ).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("routes a verified pending-consent session to /consent (N-3)", async () => {
+    login.mockResolvedValue({
+      ...tokenResponse,
+      user: {
+        ...tokenResponse.user,
+        account_status: "pending_guardian_consent",
+      },
+    });
+    const user = userEvent.setup();
+    renderWithIntl(<LoginForm />);
+
+    await user.type(screen.getByLabelText(viMessages.auth.email), "a@b.vn");
+    await user.type(
+      screen.getByLabelText(viMessages.auth.password),
+      "abcdef12",
+    );
+    await user.click(
+      screen.getByRole("button", { name: viMessages.auth.loginSubmit }),
+    );
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/consent"));
+  });
+
+  it("on 403 EMAIL_NOT_VERIFIED shows the not-verified notice and resends (N-3)", async () => {
+    // A correct password on an unverified account returns 403 — a distinct
+    // message (not the generic 401) with a resend affordance, and no navigation.
+    login.mockRejectedValue(new ApiError(403, "unused", "EMAIL_NOT_VERIFIED"));
+    resendVerification.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderWithIntl(<LoginForm />);
+
+    await user.type(screen.getByLabelText(viMessages.auth.email), "a@b.vn");
+    await user.type(
+      screen.getByLabelText(viMessages.auth.password),
+      "abcdef12",
+    );
+    await user.click(
+      screen.getByRole("button", { name: viMessages.auth.loginSubmit }),
+    );
+
+    expect(
+      await screen.findByText(viMessages.auth.emailNotVerified),
+    ).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+
+    // The resend affordance resends to the entered email and confirms neutrally.
+    await user.click(
+      screen.getByRole("button", { name: viMessages.auth.resend }),
+    );
+    await waitFor(() =>
+      expect(resendVerification).toHaveBeenCalledWith("a@b.vn"),
+    );
+    expect(
+      await screen.findByText(viMessages.auth.resendDone),
+    ).toBeInTheDocument();
   });
 });

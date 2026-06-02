@@ -1,5 +1,8 @@
 import { Be_Vietnam_Pro } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
 import type { Preview } from "@storybook/nextjs-vite";
+
+import messages from "@/messages/vi.json";
 
 // Load the app's Tailwind layer + design tokens so stories render with the same
 // styling as production (Chromatic then pixel-diffs the real surfaces, not bare
@@ -23,6 +26,16 @@ if (typeof document !== "undefined") {
 }
 
 const preview: Preview = {
+  // Components that call `useTranslations` (auth notices, verify view) need a
+  // next-intl provider in scope. Wrap every story in the real vi catalog so the
+  // rendered copy matches production (Chromatic pixel-diffs the actual strings).
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="vi" messages={messages}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
   parameters: {
     controls: {
       matchers: {

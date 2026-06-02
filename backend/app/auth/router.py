@@ -11,10 +11,13 @@ from app.api.deps import (
     settings_dep,
 )
 from app.auth.schemas import (
+    AcceptedResponse,
     LoginRequest,
     RegisterRequest,
+    ResendVerificationRequest,
     TokenResponse,
     UserOut,
+    VerifyEmailRequest,
 )
 from app.auth.service import AuthService, IssuedTokens
 from app.core.config import Settings
@@ -46,13 +49,48 @@ def _token_response(response: Response, issued: IssuedTokens, settings: Settings
     )
 
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=AcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def register(
     payload: RegisterRequest,
     service: AuthService = Depends(auth_service),
-) -> UserOut:
-    user = await service.register(payload)
-    return UserOut.model_validate(user)
+) -> AcceptedResponse:
+    # N-3: always 202 with a generic body — no UserOut, no session. The reply is
+    # identical for a brand-new, duplicate, or otherwise-handled email so the
+    # endpoint never becomes an enumeration oracle (spec §2.1/§5). The service
+    # decides internally whether a real account + verification mail is created.
+    await service.register(payload)
+    return AcceptedResponse()
+
+
+@router.post("/verify-email", status_code=status.HTTP_204_NO_CONTENT)
+async def verify_email(
+    payload: VerifyEmailRequest,
+    service: AuthService = Depends(auth_service),
+) -> Response:
+    # N-3: every failure (unknown / [CRED_47E73CB6] / [CRED_5FFEE6AB] token) is one generic
+    # TokenError (401) — never reveals whether the token existed (spec §5).
+    await service.verify_email(payload.token)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/resend-verification",
+    response_model=AcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def resend_verification(
+    payload: ResendVerificationRequest,
+    service: AuthService = Depends(auth_service),
+) -> AcceptedResponse:
+    # N-3: always 202 with a generic body regardless of whether the address
+    # exists or is already verified — the real send happens only internally for a
+    # live, still-unverified account (spec §5). Rate-limited in middleware.
+    await service.resend_verification(payload.email)
+    return AcceptedResponse()
 
 
 @router.post("/login", response_model=TokenResponse)

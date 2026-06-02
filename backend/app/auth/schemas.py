@@ -51,6 +51,37 @@ class LoginRequest(BaseModel):
         return value.strip().lower()
 
 
+class VerifyEmailRequest(BaseModel):
+    """N-3: the raw single-use token from the verification link."""
+
+    token: str = Field(min_length=1, max_length=512)
+
+
+class ResendVerificationRequest(BaseModel):
+    """N-3: request a fresh verification link. Always answered with a generic
+    202 regardless of whether the email exists / is already verified (§5)."""
+
+    email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def _normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+
+class AcceptedResponse(BaseModel):
+    """Generic 202 body for register / resend-verification.
+
+    Deliberately carries NO account data and NO session: a single, constant
+    message for every input so neither endpoint becomes an enumeration oracle
+    (spec §2.1/§5). The frontend shows a "check your email" screen on 202.
+    """
+
+    message: str = (
+        "Nếu thông tin hợp lệ, chúng tôi đã gửi email xác minh. Vui lòng kiểm tra hộp thư."
+    )
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -6,20 +6,28 @@ rotation (CP-7), logout revocation, and the `me` lookup.
 
 from __future__ import annotations
 
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from app.auth.age import derive_age_band
 from app.auth.models import RefreshToken, User
-from app.auth.repository import IRefreshTokenRepo, IRevokedTokenRepo, IUserRepo
+from app.auth.repository import (
+    IEmailVerificationTokenRepo,
+    IRefreshTokenRepo,
+    IRevokedTokenRepo,
+    IUserRepo,
+)
 from app.auth.schemas import LoginRequest, RegisterRequest
 from app.core.audit import IAuditRepo
 from app.core.config import Settings
 from app.core.enums import AccountStatus, AgeBand, Role, UserType
 from app.core.exceptions import (
+    EmailNotVerifiedError,
     InvalidCredentialsError,
     TokenError,
 )
+from app.core.mailer import IMailer
 from app.core.models import new_uuid, utcnow
 from app.core.security import (
     create_access_token,
@@ -60,12 +68,16 @@ class AuthService:
         users: IUserRepo,
         tokens: IRefreshTokenRepo,
         revoked: IRevokedTokenRepo,
+        email_tokens: IEmailVerificationTokenRepo,
+        mailer: IMailer,
         audit: IAuditRepo,
     ) -> None:
         self._settings = settings
         self._users = users
         self._tokens = tokens
         self._revoked = revoked
+        self._email_tokens = email_tokens
+        self._mailer = mailer
         self._audit = audit
 
     # -- registration -----------------------------------------------------
@@ -122,6 +134,10 @@ class AuthService:
             account_status=account_status,
         )
         await self._users.add(user)
+        # N-3: no session is issued at register. The account is unusable until the
+        # email is proven via the verification link (login gates on
+        # ``email_verified_at``). Issue + "send" the link now.
+        await self._issue_verification_email(user, now=utcnow())
         await self._audit.record(
             action="auth.register.succeeded",
             actor_id=user.id,
@@ -129,6 +145,62 @@ class AuthService:
             target_id=user.id,
         )
         return user
+
+    # -- email verification (N-3) ----------------------------------------
+
+    async def verify_email(self, raw_token: str) -> None:
+        """Consume a single-use verification token and mark the email proven.
+
+        Every failure mode (unknown / [CRED_47E73CB6] / [CRED_5FFEE6AB] token) collapses to ONE
+        generic ``TokenError`` so the endpoint never reveals whether a token
+        existed or merely lapsed (spec §5). Single-use: success stamps
+        ``consumed_at`` so a replay of the same link is rejected.
+        """
+        now = datetime.now(UTC)
+        token = await self._email_tokens.get_by_hash(hash_refresh_token(raw_token))
+        if token is None or token.consumed_at is not None or _as_utc(token.expires_at) <= now:
+            raise TokenError()
+
+        user = await self._users.get_by_id(token.user_id)
+        if user is None:
+            # FK is ON DELETE CASCADE, so a live token implies a live user; treat
+            # the impossible case as a generic failure rather than a 500.
+            raise TokenError()
+
+        user.email_verified_at = now
+        await self._users.update(user)
+        await self._email_tokens.consume(token, when=now)
+        await self._audit.record(
+            action="auth.email.verified", actor_id=user.id, target_type="User", target_id=user.id
+        )
+
+    async def resend_verification(self, email: str) -> None:
+        """Re-issue a verification link — enumeration-safe (always a no-op to the
+        caller; the router always answers 202).
+
+        Only does real work when the address maps to a live, still-unverified
+        account; every other input (unknown email, already-verified, deleted) is
+        a silent no-op so the response cannot distinguish them (spec §5). On the
+        real path, prior unconsumed tokens are invalidated so only the newest
+        link works.
+        """
+        now = datetime.now(UTC)
+        user = await self._users.get_by_email(email)
+        if (
+            user is None
+            or user.email_verified_at is not None
+            or user.is_deleted
+            or user.account_status == AccountStatus.DELETED
+        ):
+            return
+        await self._email_tokens.invalidate_unconsumed_for_user(user.id, when=now)
+        await self._issue_verification_email(user, now=now)
+        await self._audit.record(
+            action="auth.email.verification_resent",
+            actor_id=user.id,
+            target_type="User",
+            target_id=user.id,
+        )
 
     # -- login ------------------------------------------------------------
 
@@ -158,6 +230,17 @@ class AuthService:
                 action="auth.login.rejected_deleted", actor_id=user.id, target_type="User"
             )
             raise InvalidCredentialsError()
+
+        # N-3: gate on proven email ownership — but ONLY here, after the password
+        # check has passed. The caller has demonstrated knowledge of the
+        # credential, so disclosing "not verified" is industry-standard and not a
+        # pre-auth enumeration oracle (spec §2.2/§5). A wrong password still
+        # returns the generic 401 above.
+        if user.email_verified_at is None:
+            await self._audit.record(
+                action="auth.login.email_unverified", actor_id=user.id, target_type="User"
+            )
+            raise EmailNotVerifiedError()
 
         # H-02: bump the session epoch on every successful login so any
         # previously leaked *bare* access token (sv now stale) is rejected.
@@ -277,6 +360,19 @@ class AuthService:
 
     async def get_user(self, user_id: str) -> User | None:
         return await self._users.get_by_id(user_id)
+
+    async def _issue_verification_email(self, user: User, *, now: datetime) -> None:
+        """Mint a single-use token (hash-only at rest) and hand the raw link to
+        the mailer port. Raw token leaves the system only via the email link."""
+        raw_token = secrets.token_urlsafe(32)
+        await self._email_tokens.add(
+            user_id=user.id,
+            token_hash=hash_refresh_token(raw_token),
+            expires_at=now + timedelta(hours=self._settings.verification_token_ttl_hours),
+            created_at=now,
+        )
+        verify_url = f"{self._settings.frontend_base_url}/verify-email?token={raw_token}"
+        await self._mailer.send_verification_email(to=user.email, verify_url=verify_url)
 
     async def _issue_session(
         self,

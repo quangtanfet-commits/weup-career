@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from app.auth.models import RefreshToken, User
 from app.auth.repository import (
+    SqlEmailVerificationTokenRepo,
     SqlRefreshTokenRepo,
     SqlRevokedTokenRepo,
     SqlUserRepo,
@@ -22,6 +23,7 @@ from app.core.audit import SqlAuditRepo
 from app.core.config import Settings
 from app.core.enums import AccountStatus, AgeBand, UserType
 from app.core.exceptions import TokenError
+from app.core.mailer import CapturingMailer
 from app.core.models import new_uuid, utcnow
 from app.core.security import decode_access_token, hash_refresh_token
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,8 +35,20 @@ def _service(session: AsyncSession, settings: Settings) -> AuthService:
         users=SqlUserRepo(session),
         tokens=SqlRefreshTokenRepo(session),
         revoked=SqlRevokedTokenRepo(session),
+        email_tokens=SqlEmailVerificationTokenRepo(session),
+        mailer=CapturingMailer(),
         audit=SqlAuditRepo(session),
     )
+
+
+async def _mark_verified(session: AsyncSession, email: str) -> None:
+    """Stamp ``email_verified_at`` so a service-level login (which gates on it,
+    N-3) succeeds. These edge-path tests exercise refresh / session-version, not
+    the verification flow itself, so the gate is satisfied directly."""
+    user = await SqlUserRepo(session).get_by_email(email)
+    assert user is not None
+    user.email_verified_at = utcnow()
+    await session.flush()
 
 
 async def _make_user(session: AsyncSession) -> User:
@@ -162,6 +176,7 @@ async def test_full_register_login_refresh_cycle(session: AsyncSession, settings
         )
     )
     assert user.account_status == AccountStatus.ACTIVE
+    await _mark_verified(session, "cycle@example.com")
     issued = await svc.login(
         LoginRequest(email="cycle@example.com", password="Password123"),
         user_agent="pytest",
@@ -321,6 +336,7 @@ async def test_login_bumps_session_version_and_stamps_token(
             user_type=UserType.STUDENT,
         )
     )
+    await _mark_verified(session, "sv@example.com")
     first = await svc.login(LoginRequest(email="sv@example.com", password="Password123"))
     second = await svc.login(LoginRequest(email="sv@example.com", password="Password123"))
 

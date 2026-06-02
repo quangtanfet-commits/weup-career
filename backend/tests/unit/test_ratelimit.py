@@ -118,6 +118,11 @@ def test_classify_auth_post_buckets() -> None:
         "refresh",
         "ip",
     )
+    # N-3: resend-verification has its own tighter per-IP bucket.
+    assert _classify(_request(path="/api/v1/auth/resend-verification", method="POST")) == (
+        "resend_verification",
+        "ip",
+    )
 
 
 def test_classify_other_api_is_global_sub_bucket() -> None:

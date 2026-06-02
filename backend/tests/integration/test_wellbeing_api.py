@@ -16,7 +16,7 @@ from app.core.database import Database
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from tests.conftest import child_dob, enroll_membership, register_payload
+from tests.conftest import child_dob, enroll_membership, mailer_of, register_and_verify
 
 pytestmark = pytest.mark.asyncio
 
@@ -33,9 +33,9 @@ _FORBIDDEN_FIELDS = (
 
 
 async def _register(client: AsyncClient, **kw: str) -> dict[str, str]:
-    resp = await client.post("/api/v1/auth/register", json=register_payload(**kw))
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    # ``register_and_verify`` returns the login TokenResponse (``access_token`` +
+    # ``user``); these helpers only need the user record (``id``), so unwrap.
+    return (await register_and_verify(client, mailer_of(client), **kw))["user"]
 
 
 async def _token(client: AsyncClient, email: str, password: str = "Password123") -> str:

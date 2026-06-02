@@ -90,6 +90,10 @@ def _classify(request: Request) -> tuple[str | None, str]:
             return "login", "ip"
         if path == "/api/v1/auth/refresh":
             return "refresh", "ip"
+        if path == "/api/v1/auth/resend-verification":
+            # N-3: tighter than register — the email is the only input and each
+            # hit sends mail, so cap re-requests per IP/window to deter scanning.
+            return "resend_verification", "ip"
     return "api", "sub"
 
 
@@ -141,6 +145,10 @@ def make_rate_limit_middleware(
         "refresh": (
             settings.rate_limit_refresh_max,
             settings.rate_limit_refresh_window_seconds,
+        ),
+        "resend_verification": (
+            settings.rate_limit_resend_verification_max,
+            settings.rate_limit_resend_verification_window_seconds,
         ),
         "api": (
             settings.rate_limit_api_max,

@@ -16,7 +16,7 @@ from app.guardians.repository import SqlGuardianRepo
 from app.main import create_app
 from httpx import ASGITransport, AsyncClient
 
-from tests.conftest import child_dob, register_payload
+from tests.conftest import child_dob, mailer_of, register_and_verify
 
 
 async def test_ready_returns_503_when_db_down(settings: Settings) -> None:
@@ -121,12 +121,7 @@ async def test_me_missing_user_after_delete(client: AsyncClient, db) -> None:  #
     from app.auth.models import User
     from sqlalchemy import delete
 
-    await client.post("/api/v1/auth/register", json=register_payload())
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "adult@example.com", "password": "Password123"},
-    )
-    token = login.json()["access_token"]
+    token = (await register_and_verify(client, mailer_of(client)))["access_token"]
     # Delete the user (and its tokens) directly via the shared test DB.
     async with db.session_factory() as s:
         await s.execute(delete(User).where(User.email == "adult@example.com"))
@@ -141,21 +136,17 @@ async def test_register_under16_then_invite_unverified_consent_paths(
     """Cover guardian-service: child-not-found is unreachable via API, but the
     duplicate/[CRED_C2EBF1F6] branches are exercised elsewhere; here we ensure an
     under-16 invite to a real guardian succeeds end to end."""
-    await client.post(
-        "/api/v1/auth/register",
-        json=register_payload(
-            email="c3@example.com", dob=child_dob(13), school_level="lower_secondary"
-        ),
-    )
-    await client.post(
-        "/api/v1/auth/register",
-        json=register_payload(email="g3@example.com", dob="1980-01-01"),
-    )
-    clogin = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "c3@example.com", "password": "Password123"},
-    )
-    ctoken = clogin.json()["access_token"]
+    mailer = mailer_of(client)
+    ctoken = (
+        await register_and_verify(
+            client,
+            mailer,
+            email="c3@example.com",
+            dob=child_dob(13),
+            school_level="lower_secondary",
+        )
+    )["access_token"]
+    await register_and_verify(client, mailer, email="g3@example.com", dob="1980-01-01")
     invite = await client.post(
         "/api/v1/guardians/invite",
         json={"guardian_email": "g3@example.com", "relationship": "father"},

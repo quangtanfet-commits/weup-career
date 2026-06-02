@@ -1,6 +1,8 @@
-"""Auth API integration tests (FR-01/02/05/06, CP-7)."""
+"""Auth API integration tests (FR-01/02/05/06, CP-7, N-3 email verification)."""
 
 from __future__ import annotations
+
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from app.core.audit_models import AuditLog
@@ -8,9 +10,38 @@ from app.core.database import Database
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from tests.conftest import child_dob, register_payload
+from tests.conftest import child_dob, mailer_of, register_and_verify, register_payload
 
 pytestmark = pytest.mark.asyncio
+
+_ACCEPTED_MESSAGE = (
+    "Nếu thông tin hợp lệ, chúng tôi đã gửi email xác minh. Vui lòng kiểm tra hộp thư."
+)
+
+
+async def _register_verified(client: AsyncClient, **kw: str) -> None:
+    """Register (202) → pull token from captured mail → verify (204). No login.
+
+    The seam for tests that need a verified account but want to drive the login
+    request themselves (e.g. to assert cookies / token shape / failure codes).
+    """
+    mailer = mailer_of(client)
+    payload = register_payload(**kw)
+    email = payload["email"].strip().lower()
+    resp = await client.post("/api/v1/auth/register", json=payload)
+    assert resp.status_code == 202, resp.text
+    sent = mailer.last_for(email)
+    assert sent is not None, f"no verification email captured for {email}"
+    token = parse_qs(urlsplit(sent.verify_url).query)["token"][0]
+    verify = await client.post("/api/v1/auth/verify-email", json={"token": token})
+    assert verify.status_code == 204, verify.text
+
+
+async def _verification_token_for(client: AsyncClient, email: str) -> str:
+    """Most-recent raw verification token captured for ``email`` (N-3 §6.1)."""
+    sent = mailer_of(client).last_for(email.strip().lower())
+    assert sent is not None, f"no verification email captured for {email}"
+    return parse_qs(urlsplit(sent.verify_url).query)["token"][0]
 
 
 async def test_health_and_ready(client: AsyncClient) -> None:
@@ -20,24 +51,46 @@ async def test_health_and_ready(client: AsyncClient) -> None:
     assert ready.json()["database"] == "up"
 
 
-async def test_register_adult_active(client: AsyncClient) -> None:
+# -- N-3: register is enumeration-safe (always 202, no session) -----------
+
+
+async def test_register_returns_generic_202_no_session(client: AsyncClient) -> None:
+    """N-3 §2.1/§5: register never returns account data or a session — only a
+    constant 202 body. No UserOut field, no refresh cookie, no access token."""
     resp = await client.post("/api/v1/auth/register", json=register_payload())
-    assert resp.status_code == 201
+    assert resp.status_code == 202
     body = resp.json()
+    assert body == {"message": _ACCEPTED_MESSAGE}
+    # None of the leaked-shape fields are present.
+    for leaked in ("id", "account_status", "age_band", "access_token", "hashed_password"):
+        assert leaked not in body
+    assert "refresh_token" not in resp.cookies
+
+
+async def test_register_adult_active(client: AsyncClient) -> None:
+    """The derived account is adult/active — observed post-verify via /me."""
+    login = await register_and_verify(client, mailer_of(client))
+    token = login["access_token"]
+    me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.status_code == 200
+    body = me.json()
     assert body["account_status"] == "active"
     assert body["age_band"] == "adult"
     assert "hashed_password" not in body
 
 
 async def test_register_under16_pending_consent_cp1(client: AsyncClient) -> None:
-    resp = await client.post(
-        "/api/v1/auth/register",
-        json=register_payload(
-            email="kid@example.com", dob=child_dob(12), school_level="lower_secondary"
-        ),
+    login = await register_and_verify(
+        client,
+        mailer_of(client),
+        email="kid@example.com",
+        dob=child_dob(12),
+        school_level="lower_secondary",
     )
-    assert resp.status_code == 201
-    body = resp.json()
+    token = login["access_token"]
+    me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.status_code == 200
+    body = me.json()
     assert body["age_band"] == "under_16"
     assert body["account_status"] == "pending_guardian_consent"
 
@@ -45,59 +98,42 @@ async def test_register_under16_pending_consent_cp1(client: AsyncClient) -> None
 async def test_register_duplicate_email_indistinguishable_pt04(client: AsyncClient) -> None:
     """PT-04: a duplicate email must not be a user-enumeration oracle.
 
-    The second registration of the same email returns a 201 + UserOut that is
-    indistinguishable from a fresh registration of that payload: same shape,
-    same derived fields, but a freshly-random id (never the existing user's).
+    Registration is enumeration-safe: every call returns the SAME 202 + generic
+    body whether the email is brand-new or already taken. Neither the status
+    code nor any field distinguishes the two (spec §2.1/§5).
     """
     first = await client.post("/api/v1/auth/register", json=register_payload())
-    assert first.status_code == 201
-    first_body = first.json()
-
+    assert first.status_code == 202
     second = await client.post("/api/v1/auth/register", json=register_payload())
-    assert second.status_code == 201
-    second_body = second.json()
-
-    # Identical response shape — no field leaks "already exists".
-    assert set(first_body.keys()) == set(second_body.keys())
-    assert "hashed_password" not in second_body
-    # Derived/echoed fields match the submitted payload on both responses.
-    assert second_body["email"] == first_body["email"] == "adult@example.com"
-    assert second_body["account_status"] == first_body["account_status"] == "active"
-    assert second_body["age_band"] == first_body["age_band"] == "adult"
-    # The synthesized id must be a fresh value, never the real user's id.
-    assert second_body["id"] != first_body["id"]
+    assert second.status_code == 202
+    # Byte-for-byte identical generic body — nothing leaks "already exists".
+    assert first.json() == second.json() == {"message": _ACCEPTED_MESSAGE}
 
 
 async def test_register_duplicate_under16_indistinguishable_pt04(client: AsyncClient) -> None:
-    """The synthesized duplicate path derives consent status from the payload,
-    so a duplicate under-16 email still looks like a real under-16 signup."""
+    """A duplicate under-16 email is likewise indistinguishable: same 202 body."""
     payload = register_payload(
         email="kid@example.com", dob=child_dob(12), school_level="lower_secondary"
     )
     first = await client.post("/api/v1/auth/register", json=payload)
-    assert first.status_code == 201
+    assert first.status_code == 202
     second = await client.post("/api/v1/auth/register", json=payload)
-    assert second.status_code == 201
-    body = second.json()
-    assert body["age_band"] == "under_16"
-    assert body["account_status"] == "pending_guardian_consent"
-    assert body["id"] != first.json()["id"]
+    assert second.status_code == 202
+    assert first.json() == second.json() == {"message": _ACCEPTED_MESSAGE}
 
 
 async def test_register_duplicate_is_db_noop_pt04(client: AsyncClient) -> None:
     """The duplicate path must not persist or mutate the existing account: the
     second password is never stored, so the original password still logs in and
     the second does not."""
-    await client.post(
-        "/api/v1/auth/register",
-        json=register_payload(password="Password123"),
-    )
-    # Re-register the same email with a *different* password.
+    # First registration through the full verify flow so the account can log in.
+    await register_and_verify(client, mailer_of(client), password="Password123")
+    # Re-register the same email with a *different* password (202, suppressed).
     resp = await client.post(
         "/api/v1/auth/register",
-        json=register_payload(password="Secondpw789"),
+        json=register_payload(password="DifferentPass456"),
     )
-    assert resp.status_code == 201
+    assert resp.status_code == 202
 
     # Original password still authenticates → the account was untouched.
     ok = await client.post(
@@ -106,10 +142,11 @@ async def test_register_duplicate_is_db_noop_pt04(client: AsyncClient) -> None:
     )
     assert ok.status_code == 200
 
-    # The duplicate-registration password was never stored.
+    # The duplicate-registration password was never stored (wrong-pw 401 before
+    # the verification gate, so this is a clean credential rejection).
     bad = await client.post(
         "/api/v1/auth/login",
-        json={"email": "adult@example.com", "password": "Secondpw789"},
+        json={"email": "adult@example.com", "password": "DifferentPass456"},
     )
     assert bad.status_code == 401
 
@@ -143,10 +180,10 @@ async def test_register_duplicate_audited_defender_side_pt04(
 
 
 async def test_register_email_normalized(client: AsyncClient) -> None:
-    resp = await client.post(
-        "/api/v1/auth/register", json=register_payload(email="  MixEd@Example.COM ")
-    )
-    assert resp.json()["email"] == "mixed@example.com"
+    login = await register_and_verify(client, mailer_of(client), email="  MixEd@Example.COM ")
+    token = login["access_token"]
+    me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.json()["email"] == "mixed@example.com"
 
 
 @pytest.mark.parametrize(
@@ -164,8 +201,119 @@ async def test_register_future_dob_422(client: AsyncClient) -> None:
     assert resp.status_code == 422
 
 
-async def test_login_success_sets_cookie(client: AsyncClient) -> None:
+# -- N-3: verify-email (single-use, generic-failure) ----------------------
+
+
+async def test_verify_email_then_login_succeeds(client: AsyncClient) -> None:
+    """The golden path: register (202) → verify (204) → login (200)."""
+    resp = await client.post("/api/v1/auth/register", json=register_payload())
+    assert resp.status_code == 202
+    token = await _verification_token_for(client, "adult@example.com")
+    verify = await client.post("/api/v1/auth/verify-email", json={"token": token})
+    assert verify.status_code == 204
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "adult@example.com", "password": "Password123"},
+    )
+    assert login.status_code == 200
+    assert "access_token" in login.json()
+
+
+async def test_login_before_verify_403_email_not_verified(client: AsyncClient) -> None:
+    """N-3 login gate: correct password but unverified email → 403 (post-credential,
+    not a pre-auth oracle). The code is distinct from wrong-password 401."""
+    resp = await client.post("/api/v1/auth/register", json=register_payload())
+    assert resp.status_code == 202
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "adult@example.com", "password": "Password123"},
+    )
+    assert login.status_code == 403
+    assert login.json()["error"]["code"] == "EMAIL_NOT_VERIFIED"
+
+
+async def test_verify_email_replay_rejected_single_use(client: AsyncClient) -> None:
+    """A verification token is single-use: replaying a consumed token collapses
+    to the SAME generic 401 INVALID_TOKEN as any other bad token (spec §5)."""
     await client.post("/api/v1/auth/register", json=register_payload())
+    token = await _verification_token_for(client, "adult@example.com")
+    assert (
+        await client.post("/api/v1/auth/verify-email", json={"token": token})
+    ).status_code == 204
+    replay = await client.post("/api/v1/auth/verify-email", json={"token": token})
+    assert replay.status_code == 401
+    assert replay.json()["error"]["code"] == "INVALID_TOKEN"
+
+
+async def test_verify_email_unknown_token_generic_401(client: AsyncClient) -> None:
+    """An unknown token is indistinguishable from a consumed/expired one (§5)."""
+    resp = await client.post(
+        "/api/v1/auth/verify-email", json={"token": "totally-made-up-token-value"}
+    )
+    assert resp.status_code == 401
+    assert resp.json()["error"]["code"] == "INVALID_TOKEN"
+
+
+async def test_verify_email_empty_token_422(client: AsyncClient) -> None:
+    """An empty token is a request-shape violation (min_length=1), not an oracle."""
+    resp = await client.post("/api/v1/auth/verify-email", json={"token": ""})
+    assert resp.status_code == 422
+
+
+# -- N-3: resend-verification (always 202, no oracle) ---------------------
+
+
+async def test_resend_verification_unknown_email_202(client: AsyncClient) -> None:
+    """Resend for an address that does not exist is a silent no-op → 202."""
+    resp = await client.post(
+        "/api/v1/auth/resend-verification", json={"email": "ghost@example.com"}
+    )
+    assert resp.status_code == 202
+    assert resp.json() == {"message": _ACCEPTED_MESSAGE}
+    # No mail is actually sent to a non-existent account.
+    assert mailer_of(client).last_for("ghost@example.com") is None
+
+
+async def test_resend_verification_issues_fresh_usable_token(client: AsyncClient) -> None:
+    """For a live, still-unverified account, resend delivers a working token and
+    invalidates the prior one (the new token verifies; the old one is dead)."""
+    await client.post("/api/v1/auth/register", json=register_payload())
+    first_token = await _verification_token_for(client, "adult@example.com")
+
+    resp = await client.post(
+        "/api/v1/auth/resend-verification", json={"email": "adult@example.com"}
+    )
+    assert resp.status_code == 202
+    second_token = await _verification_token_for(client, "adult@example.com")
+    assert second_token != first_token
+
+    # Old token is now invalidated…
+    assert (
+        await client.post("/api/v1/auth/verify-email", json={"token": first_token})
+    ).status_code == 401
+    # …and the freshly-issued one verifies.
+    assert (
+        await client.post("/api/v1/auth/verify-email", json={"token": second_token})
+    ).status_code == 204
+
+
+async def test_resend_verification_already_verified_202_no_mail(client: AsyncClient) -> None:
+    """Resend for an already-verified account is a silent no-op → 202, no new mail."""
+    await register_and_verify(client, mailer_of(client))
+    before = len(mailer_of(client).sent)
+    resp = await client.post(
+        "/api/v1/auth/resend-verification", json={"email": "adult@example.com"}
+    )
+    assert resp.status_code == 202
+    # No additional verification mail was queued for the verified account.
+    assert len(mailer_of(client).sent) == before
+
+
+# -- login / me -----------------------------------------------------------
+
+
+async def test_login_success_sets_cookie(client: AsyncClient) -> None:
+    await _register_verified(client)
     resp = await client.post(
         "/api/v1/auth/login",
         json={"email": "adult@example.com", "password": "Password123"},
@@ -178,10 +326,12 @@ async def test_login_success_sets_cookie(client: AsyncClient) -> None:
 
 
 async def test_login_wrong_password_401(client: AsyncClient) -> None:
+    # Wrong password is rejected with 401 INVALID_CREDENTIALS *before* the email
+    # gate, so the account need not be verified for this assertion to hold.
     await client.post("/api/v1/auth/register", json=register_payload())
     resp = await client.post(
         "/api/v1/auth/login",
-        json={"email": "adult@example.com", "password": "WrongPass1"},
+        json={"email": "adult@example.com", "password": "WrongPassword1"},
     )
     assert resp.status_code == 401
     assert resp.json()["error"]["code"] == "INVALID_CREDENTIALS"
@@ -201,12 +351,8 @@ async def test_me_requires_auth(client: AsyncClient) -> None:
 
 
 async def test_me_returns_profile(client: AsyncClient) -> None:
-    await client.post("/api/v1/auth/register", json=register_payload())
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "adult@example.com", "password": "Password123"},
-    )
-    token = login.json()["access_token"]
+    login = await register_and_verify(client, mailer_of(client))
+    token = login["access_token"]
     resp = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     assert resp.json()["email"] == "adult@example.com"
@@ -218,12 +364,8 @@ async def test_me_bad_token_401(client: AsyncClient) -> None:
 
 
 async def _register_login(client: AsyncClient) -> str:
-    await client.post("/api/v1/auth/register", json=register_payload())
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "adult@example.com", "password": "Password123"},
-    )
-    return login.json()["access_token"]
+    """Register → verify → login; return the access token (N-3-routed)."""
+    return (await register_and_verify(client, mailer_of(client)))["access_token"]
 
 
 async def test_refresh_rotates_token(client: AsyncClient) -> None:
@@ -313,8 +455,8 @@ async def test_logout_does_not_affect_other_users_h01(client: AsyncClient) -> No
     """One user's logout must not denylist another user's token (isolation)."""
     token_a = await _register_login(client)
     client.cookies.clear()
-    # Second, independent user.
-    await client.post("/api/v1/auth/register", json=register_payload(email="other@example.com"))
+    # Second, independent (verified) user.
+    await _register_verified(client, email="other@example.com")
     login_b = await client.post(
         "/api/v1/auth/login",
         json={"email": "other@example.com", "password": "Password123"},
@@ -407,7 +549,7 @@ async def test_relogin_does_not_affect_other_users_h02(client: AsyncClient) -> N
     """One user's re-login bumps only their own epoch — isolation across users."""
     token_a = await _register_login(client)
     client.cookies.clear()
-    await client.post("/api/v1/auth/register", json=register_payload(email="other@example.com"))
+    await _register_verified(client, email="other@example.com")
     token_b = await _login(client, email="other@example.com")
     # A re-logs in (bumps A's epoch only).
     await client.post(

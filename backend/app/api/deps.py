@@ -37,6 +37,8 @@ from app.core.database import Database
 from app.core.exceptions import AuthenticationError, PermissionDeniedError
 from app.core.mailer import ConsoleMailer, FileMailer, IMailer, SmtpMailer
 from app.core.security import decode_access_token
+from app.counselor_competency.repository import SqlCounselorCompetencyRepo
+from app.counselor_competency.service import CounselorCompetencyService
 from app.guardians.repository import SqlGuardianRepo
 from app.guardians.service import GuardianService
 from app.reco.repository import SqlRecoRepo
@@ -287,6 +289,19 @@ def wellbeing_service(
         audit=audit,
         find_counselor=schools.find_counselor_for_student,
     )
+
+
+def counselor_competency_repo(
+    session: AsyncSession = Depends(get_session),
+) -> SqlCounselorCompetencyRepo:
+    return SqlCounselorCompetencyRepo(session)
+
+
+def counselor_competency_service(
+    repo: SqlCounselorCompetencyRepo = Depends(counselor_competency_repo),
+    schools: SqlSchoolRepo = Depends(school_repo),
+) -> CounselorCompetencyService:
+    return CounselorCompetencyService(repo=repo, school=schools)
 
 
 # -- auth dependencies ----------------------------------------------------

@@ -1,10 +1,15 @@
 # NLSpec: Nền tảng Hướng nghiệp Quốc gia — WeUp Career
 
-**Phiên bản:** 2.0.0
-**Ngày:** 2026-05-29 (cập nhật trạng thái 2026-06-01)
-**Trạng thái:** IMPLEMENTED — MVP (THCS + THPT) đã triển khai & verify đầy đủ. Backend 8 slice + hardening H-01/02/03/04; Frontend 8 slice tính năng; TLA+ Gate A + Gate B 6/6 (CP-1→CP-8). Còn mở: Gate C (load test p99, per-layer 100% coverage NFR-19). Dư lượng đã chấp nhận: email verification (khắc phục triệt để PT-04 residual).
+**Phiên bản:** 2.1.0
+**Ngày:** 2026-05-29 (cập nhật trạng thái 2026-06-01; mở rộng v2.1 2026-06-04)
+**Trạng thái:** IMPLEMENTED (lõi MVP) + EXTENSIONS PROPOSED (v2.1). MVP (THCS + THPT) đã triển khai & verify đầy đủ. Backend 8 slice + hardening H-01/02/03/04; Frontend 8 slice tính năng; TLA+ Gate A + Gate B 6/6 (CP-1→CP-8). Còn mở: Gate C (load test p99, per-layer 100% coverage NFR-19). Dư lượng đã chấp nhận: email verification (khắc phục triệt để PT-04 residual).
 **Tác giả:** Engineering Team
 **Thay thế:** v1.0.0 (spec Todo app — placeholder, đã loại bỏ)
+
+> **Changelog v2.1.0 (2026-06-04) — mở rộng theo `docs/proposals/cross-research-career-guidance-proposal.md`. Các mục đánh dấu *(v2.1 — spec, chưa hiện thực)* là đặc tả đề xuất, CHƯA triển khai/verify:**
+> - **P7:** Định vị tường minh WeUp Career là "cổng thông tin hướng nghiệp quốc gia" theo TT 16/2026 (§1).
+> - **P2:** Cấu trúc hóa Labor Market Intelligence — entity `LaborMarketSnapshot` (xuất xứ bắt buộc), FR-34/FR-35. Xem [ADR-015](./adr/ADR-015-labor-market-intelligence.md).
+> - **P1:** Khung năng lực & tự đánh giá tư vấn viên — §3.11 (FR-100..103), entity `CounselorCompetency`/`CounselorSelfAssessment`, module độc lập không đụng CP-1..CP-8. Xem [ADR-016](./adr/ADR-016-counselor-competency-framework.md).
 
 > **Quy ước ngôn ngữ:** Văn xuôi/đặc tả bằng tiếng Việt (đồng bộ với `docs/legal/legal-basis.md`, `docs/research/`). Định danh kỹ thuật (entity, field, enum, API path, mã FR/NFR) giữ tiếng Anh.
 >
@@ -20,6 +25,8 @@
 Xây dựng **WeUp Career** — nền tảng số hướng nghiệp quốc gia cho học sinh, sinh viên và người đi làm tại Việt Nam. Hệ thống cung cấp 5 nội dung hướng nghiệp bắt buộc theo **TT 16/2026/TT-BGDĐT Điều 5**, dựa trên **bộ công cụ tự đánh giá chuẩn quốc tế** (RIASEC, VIPS, MBTI), một **mô hình năng lực hợp nhất** (12 năng lực ABCD × 3 lĩnh vực, đo theo trục K-A-R kiểu NCDG), và **gợi ý ngành/nghề/lộ trình có giải thích** theo nguyên tắc **con người ra quyết định cuối cùng** (human-in-the-loop).
 
 Nền tảng số này **chính là** nội dung "(đ) Ứng dụng CNTT & chuyển đổi số trong hướng nghiệp" — vừa là sản phẩm, vừa được pháp luật hợp pháp hóa & yêu cầu (Luật 123/2025 Đ.19, CT 29-CT/TW, TT 16/2026 Đ.5đ).
+
+**Định vị "cổng thông tin hướng nghiệp quốc gia" (P7).** WeUp Career được thiết kế để đáp ứng vai trò *cổng thông tin hướng nghiệp* mà TT 16/2026 mô tả: tập trung thông tin nghề nghiệp, xu hướng thị trường lao động, lộ trình học tập và học liệu; phục vụ học sinh, giám hộ, nhà trường trên phạm vi toàn quốc. Yêu cầu **an toàn thông tin & bảo vệ dữ liệu cá nhân** đối với cổng (thu thập/lưu trữ/sử dụng) đã được hiện thực qua NFR-10 (mã hóa & audit dữ liệu nhạy cảm), NFR-14 (xác thực/phân quyền), NFR-16 (audit bất biến), và DPIA (NFR-13). *Ghi chú nguồn:* căn cứ pháp lý chi tiết (số hiệu/ngày ban hành TT 16/2026 và các văn bản liên quan) lấy theo `docs/legal/legal-basis.md` — nguồn có thẩm quyền của dự án; **không** trích số liệu/ngày từ báo cáo nghiên cứu chưa kiểm chứng.
 
 ### Mục tiêu (Goals)
 - **G-01:** Hiện thực hóa **đủ 5 nội dung Điều 5** thành module có căn cứ pháp lý minh bạch, mỗi đơn vị nội dung gắn `dieu5_code` + `competency_code`.
@@ -96,6 +103,8 @@ Nền tảng số này **chính là** nội dung "(đ) Ứng dụng CNTT & chuy�
 - **FR-31:** Thông tin trường/ngành đào tạo, bao gồm nhánh **GDNN & "trường trung học nghề"** (Luật GDNN 124/2025) như một hướng phân luồng sau THCS.
 - **FR-32:** Tìm kiếm/lọc nghề theo nhóm RIASEC, lĩnh vực, trình độ đào tạo; liên kết kết quả trắc nghiệm → nghề gợi ý liên quan.
 - **FR-33:** Nội dung nghề **versioned** + rà soát/cập nhật định kỳ (yêu cầu TT 16/2026).
+- **FR-34:** *(v2.1 — spec, chưa hiện thực; [ADR-015](./adr/ADR-015-labor-market-intelligence.md))* **Labor Market Intelligence có cấu trúc** qua entity `LaborMarketSnapshot`: ngành (`sector`), dải lương, dự báo cầu, kỹ năng yêu cầu, vùng — **bắt buộc** `source_ref` (xuất xứ) + `as_of_date` (thời điểm). MVP nạp **dataset tĩnh có nguồn thẩm quyền** (khởi đầu khung rỗng, không dữ liệu giả); adapter HTTT TTLĐ quốc gia (Luật 74/2025 Đ.19) giai đoạn sau — **giữ NG-02** (không sở hữu dữ liệu TTLĐ).
+- **FR-35:** *(v2.1 — spec, chưa hiện thực)* Lọc/sắp xếp nghề theo **cầu lao động** dựa trên `LaborMarketSnapshot` (bồi cho FR-32); hiển thị rõ trạng thái "chưa có dữ liệu TTLĐ" khi snapshot thiếu/quá hạn (`as_of_date` vượt ngưỡng, gắn NFR-26).
 
 ### 3.5 Kỹ năng lựa chọn nghề — Điều 5(c)
 - **FR-40:** Lộ trình/bài học về quy trình ra quyết định nghề (gắn NL10, NL12; `dieu5_code=c`).
@@ -126,6 +135,15 @@ Nền tảng số này **chính là** nội dung "(đ) Ứng dụng CNTT & chuy�
 - **FR-90:** `content_editor` tạo/sửa nội dung với bắt buộc gắn `competency_code`, `dieu5_code`, `depth`, `dev_phase`, `school_level`; versioned.
 - **FR-91:** Người dùng xem/sửa hồ sơ; đổi mật khẩu (cần mật khẩu hiện tại); yêu cầu xóa tài khoản (soft delete + cửa sổ khôi phục).
 - **FR-92:** Hỗ trợ quyền chủ thể dữ liệu: truy cập, chỉnh sửa, xuất, xóa dữ liệu cá nhân (Luật 91/2025).
+
+### 3.11 Khung năng lực & tự đánh giá Tư vấn viên — module độc lập (gắn TT 18/2025)
+
+*(Toàn nhóm v2.1 — spec, chưa hiện thực; [ADR-016](./adr/ADR-016-counselor-competency-framework.md). Module **độc lập** với cây 12 năng lực người học; **không** đụng bất biến CP-1..CP-8.)*
+
+- **FR-100:** Hệ thống lưu **khung năng lực hành nghề tư vấn** (`CounselorCompetency`): các năng lực như đạo đức nghề, kỹ năng lắng nghe/tư vấn, hiểu công cụ trắc nghiệm, an toàn dữ liệu/BVDLCN, nhận biết dấu hiệu cần chuyển tuyến. Tách hoàn toàn khỏi `Competency` (NL1–NL12) của người học.
+- **FR-101:** `counselor` thực hiện **tự đánh giá** (`CounselorSelfAssessment`): tự xếp mức theo từng năng lực, versioned theo thời điểm; là công cụ **phát triển bản thân**, không phải KPI hành chính do `school_admin` áp xuống ở MVP.
+- **FR-102:** Hệ thống gợi ý **lộ trình phát triển** cho counselor dựa trên kết quả tự đánh giá, **kèm giải thích**; luồng riêng, KHÔNG đi qua CP-5/CP-6 (vốn ràng buộc gợi ý phân luồng người học).
+- **FR-103:** Dữ liệu tự đánh giá của counselor là **dữ liệu cá nhân của họ**, tách bạch khỏi dữ liệu hướng nghiệp học sinh; **không** thuộc phạm vi consent giám hộ (CP-1). Mọi tổng hợp/chia sẻ cho `school_admin` (nếu có, giai đoạn sau) **phải qua DPIA cập nhật** trước.
 
 ---
 
@@ -182,7 +200,9 @@ Nền tảng số này **chính là** nội dung "(đ) Ứng dụng CNTT & chuy�
 **AssessmentResult** — `id (PK)`, `user_id (FK)`, `instrument_id (FK)`, `result_payload (encrypted)`, `is_sensitive (default true)`, `version`, `created_at`. *(Mọi truy cập → AuditLog.)*
 
 ### Nội dung & gợi ý
-**CareerProfile** — `id (PK)`, `name`, `riasec_codes`, `required_competencies`, `training_paths`, `labor_market_outlook`, `source_ref`, `version`, `dieu5_code='a'`.
+**CareerProfile** — `id (PK)`, `name`, `riasec_codes`, `required_competencies`, `training_paths`, `labor_market_outlook` *(tóm tắt người-đọc; số liệu định lượng chuyển sang `LaborMarketSnapshot`)*, `source_ref`, `version`, `dieu5_code='a'`.
+
+**LaborMarketSnapshot** *(v2.1 — spec, chưa hiện thực; ADR-015)* — `id (PK)`, `sector`, `salary_range`, `demand_forecast`, `required_skills (array)`, `region`, **`source_ref (NOT NULL)`**, **`as_of_date (NOT NULL)`**, `version`, `created_at`. *(Liên kết `CareerProfile` theo `sector`; xuất xứ + thời điểm bắt buộc — chống số liệu chưa kiểm chứng. MVP dataset tĩnh có nguồn; adapter HTTT TTLĐ quốc gia sau — giữ NG-02.)*
 **ContentItem** — `id (PK)`, `title`, `body`, `competency_id (FK)`, `dieu5_code`, `depth`, `dev_phase`, `school_level`, `version`, `status (enum: draft, published, archived)`.
 **Recommendation** — `id (PK)`, `user_id (FK)`, `payload`, `rationale (NOT NULL)`, `requires_human_confirmation (default true)`, `confirmed_by (FK→User, nullable)`, `confirmed_decision (enum: accepted, rejected, deferred)`, `created_at`. *(rationale bắt buộc — bất biến CP-6.)*
 **Pathway** — `id (PK)`, `name`, `type (enum: academic, vocational_secondary, gdnn, labor)`, `description`.
@@ -191,6 +211,10 @@ Nền tảng số này **chính là** nội dung "(đ) Ứng dụng CNTT & chuy�
 **School** — `id`, `name`, `type`, `region`.
 **SchoolClass** — `id`, `school_id (FK)`, `name`, `grade`.
 **CounselingSession** — `id`, `counselor_id (FK→User)`, `student_id (FK→User)`, `tier (enum: 1,2,3)`, `notes`, `created_at`.
+
+**CounselorCompetency** *(v2.1 — spec, chưa hiện thực; ADR-016)* — `id (PK)`, `code`, `name_vi`, `name_en`, `description`, `source_ref`. *(Khung năng lực hành nghề tư vấn — đạo đức nghề, kỹ năng lắng nghe/tư vấn, hiểu công cụ trắc nghiệm, an toàn dữ liệu/BVDLCN, nhận biết dấu hiệu chuyển tuyến. Module độc lập, KHÔNG tái dụng `Competency` (NL1–NL12) của người học. Gắn TT 18/2025.)*
+
+**CounselorSelfAssessment** *(v2.1 — spec, chưa hiện thực; ADR-016)* — `id (PK)`, `counselor_id (FK→User)`, `version`, `scores (payload: điểm tự xếp theo từng `CounselorCompetency`)`, `suggested_development_path`, `created_at`. *(Tự đánh giá — công cụ phát triển bản thân của counselor, KHÔNG phải KPI do school_admin áp. Dữ liệu cá nhân của counselor, tách bạch dữ liệu hướng nghiệp học sinh, ngoài phạm vi consent giám hộ (CP-1). Gợi ý lộ trình kèm giải thích nhưng KHÔNG đụng CP-5/CP-6.)*
 
 ### Giám sát
 **AuditLog** — `id (PK)`, `actor_id`, `action`, `target_type`, `target_id`, `is_sensitive_access (bool)`, `correlation_id`, `created_at`. *(Append-only.)*
@@ -226,6 +250,10 @@ Base: `/api/v1/...`
 | POST | /recommendations/{id}/confirm | Người dùng/giám hộ/GV xác nhận | Bearer |
 | GET | /school/{id}/students | DS học sinh (phạm vi trường) | Bearer (admin/counselor) |
 | POST | /counseling/sessions | Ghi phiên tư vấn | Bearer (counselor) |
+| GET | /labor-market/snapshots | LMI có cấu trúc (lọc sector/region); rỗng nếu chưa có nguồn *(v2.1 — chưa hiện thực; ADR-015)* | Bearer |
+| GET | /counselor/competencies | Khung năng lực hành nghề tư vấn *(v2.1 — chưa hiện thực; ADR-016)* | Bearer (counselor) |
+| POST | /me/counselor/self-assessments | Counselor tự đánh giá (kèm gợi ý lộ trình) *(v2.1 — chưa hiện thực; ADR-016)* | Bearer (counselor) |
+| GET | /me/counselor/self-assessments | Lịch sử tự đánh giá của chính counselor *(v2.1 — chưa hiện thực; ADR-016)* | Bearer (counselor) |
 | GET | /health | Liveness | No |
 | GET | /ready | Readiness | No |
 
@@ -235,7 +263,7 @@ Base: `/api/v1/...`
 
 ### Gate A — Hoàn thiện spec (trước triển khai)
 - [ ] spec-preflight ≥ 0.85 trên 4 chiều rõ ràng
-- [ ] ADR cho: mô hình 2 trục, xử lý dữ liệu nhạy cảm, kiến trúc consent, AI governance
+- [ ] ADR cho: mô hình 2 trục, xử lý dữ liệu nhạy cảm, kiến trúc consent, AI governance; **(v2.1)** LMI ([ADR-015](./adr/ADR-015-labor-market-intelligence.md)), khung năng lực tư vấn viên ([ADR-016](./adr/ADR-016-counselor-competency-framework.md))
 - [ ] Threat model + **DPIA** (đánh giá tác động bảo vệ dữ liệu) hoàn tất
 - [ ] TLA+ spec thiết kế cho consent/sensitive-access/recommendation
 - [ ] Scenarios viết dưới `scenarios/` (không cho coder xem)

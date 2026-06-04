@@ -13,6 +13,7 @@ from app.auth.router import router as auth_router
 from app.careers.router import router as career_router
 from app.competency.router import router as competency_router
 from app.core.database import Database
+from app.counselor_competency.router import router as counselor_competency_router
 from app.guardians.router import router as guardian_router
 from app.reco.router import router as reco_router
 from app.school.router import router as school_router
@@ -29,6 +30,7 @@ api_router.include_router(reco_router)
 api_router.include_router(school_router)
 api_router.include_router(wellbeing_router)
 api_router.include_router(account_router)
+api_router.include_router(counselor_competency_router)
 
 
 @api_router.get("/health", tags=["ops"])

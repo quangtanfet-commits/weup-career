@@ -63,5 +63,5 @@ class SelfAssessmentOut(BaseModel):
             version=r.version,
             scores=r.scores,
             suggested_development_path=r.suggested_development_path,
-            created_at=r.created_at,  # type: ignore[arg-type]
+            created_at=r.created_at,
         )

@@ -1,0 +1,156 @@
+{
+  "schema": "assurance-report/v1",
+  "run_id": "20260604T064113Z-7b232c1",
+  "generated_at_utc": "20260604T064113Z",
+  "commit_sha": "7b232c1f8d121b4f0496a6da96f4d5e08d904e85",
+  "branch": "integration/p1-p2",
+  "module": "backend/app/counselor_competency",
+  "classification": "critical-personal-data",
+  "context": {
+    "fr": [
+      "FR-100",
+      "FR-101",
+      "FR-102",
+      "FR-103"
+    ],
+    "correctness_properties": {
+      "CP-4": "counselor self-assessment ownership re-derived from SchoolMembership per request; no cross-counselor read",
+      "CP-1": "module never touches under-16 student career-data consent gate (isolation)"
+    },
+    "adr": "ADR-016 (counselor competency is an independent module; self-assessment is not KPI)",
+    "note_doc": "docs/assurance/counselor-competency-fr103.md"
+  },
+  "thresholds": {
+    "line_pct": 95.0,
+    "branch_pct": 90.0,
+    "function_pct": 100.0
+  },
+  "measured": {
+    "line_pct": 100.0,
+    "covered_lines": 187,
+    "missing_lines": 0,
+    "num_statements": 187,
+    "branch_total": 18,
+    "branch_covered": 18,
+    "branch_missing": 0,
+    "branch_partial": 0,
+    "branch_pct": 100.0,
+    "function_pct": 100.0,
+    "function_pct_basis": "zero missed statements => every function body executed (coverage.py has no native function metric)",
+    "per_file": {
+      "app/counselor_competency/__init__.py": {
+        "line_pct": 100.0,
+        "missing_lines": 0,
+        "missing_branches": 0
+      },
+      "app/counselor_competency/models.py": {
+        "line_pct": 100.0,
+        "missing_lines": 0,
+        "missing_branches": 0
+      },
+      "app/counselor_competency/repository.py": {
+        "line_pct": 100.0,
+        "missing_lines": 0,
+        "missing_branches": 0
+      },
+      "app/counselor_competency/router.py": {
+        "line_pct": 100.0,
+        "missing_lines": 0,
+        "missing_branches": 0
+      },
+      "app/counselor_competency/schemas.py": {
+        "line_pct": 100.0,
+        "missing_lines": 0,
+        "missing_branches": 0
+      },
+      "app/counselor_competency/seed.py": {
+        "line_pct": 100.0,
+        "missing_lines": 0,
+        "missing_branches": 0
+      },
+      "app/counselor_competency/service.py": {
+        "line_pct": 100.0,
+        "missing_lines": 0,
+        "missing_branches": 0
+      }
+    }
+  },
+  "gates": {
+    "gate0_typing_defect_fix": {
+      "status": "pass",
+      "detail": "removed dead `# type: ignore[arg-type]` at schemas.py:66; CI mypy gate now green"
+    },
+    "gate1_coverage": {
+      "status": "pass",
+      "detail": "seed-idempotency test closes seed.py:116-117 re-seed branch; module 100% line / 100% branch"
+    },
+    "gate2_property_fuzz": {
+      "status": "pass",
+      "detail": "Hypothesis: codec round-trip (CC-NN + any-int rating), canonical sorted + order-independent encode, determinism, delimiter lossy-boundary pin, DB-backed version monotonicity 1..N"
+    },
+    "gate3_strict_typing": {
+      "status": "pass",
+      "detail": "mypy --strict --ignore-missing-imports: module 7 files clean; whole app/ 104 files clean"
+    },
+    "gate4_evidence_bundle": {
+      "status": "pass",
+      "detail": "this report + coverage.xml/json + mypy outputs"
+    }
+  },
+  "mypy": {
+    "command": "mypy app/ --strict --ignore-missing-imports",
+    "mypy_version": "1.20.2",
+    "module_result": "Success: no issues found in 7 source files",
+    "app_result": "Success: no issues found in 104 source files"
+  },
+  "property_fuzz": {
+    "engine": "hypothesis",
+    "hypothesis_version": "6.155.0",
+    "max_examples_per_test": 100,
+    "settings": {
+      "deadline": null,
+      "reason": "DB-backed example builds a fresh engine; deadline is wall-clock flake under coverage, not a correctness knob"
+    },
+    "tests": [
+      "test_codec_round_trip_cc_shape",
+      "test_codec_round_trip_arbitrary_int_ratings",
+      "test_encode_is_canonical_and_order_independent",
+      "test_encode_is_deterministic",
+      "test_delimiter_boundary_is_lossy_and_pinned",
+      "test_version_sequence_is_1_to_n"
+    ],
+    "triaged_findings": [
+      {
+        "finding": "decode() strips Unicode whitespace (e.g. \\xa0) from codes, so a whitespace-bearing code does not round-trip",
+        "verdict": "not-a-bug; over-broad strategy",
+        "resolution": "round-trip strategy constrained to the real delimiter/whitespace-free CC-NN domain; whitespace stripping documented as codec contract"
+      }
+    ]
+  },
+  "tests": {
+    "total": 24,
+    "by_file": {
+      "tests/unit/test_counselor_competency_seed.py": 1,
+      "tests/unit/test_counselor_competency_service.py": 6,
+      "tests/unit/test_counselor_competency_properties.py": 6,
+      "tests/integration/test_counselor_competency_api.py": 11
+    },
+    "python_version": "3.12.3",
+    "pytest_version": "9.0.3"
+  },
+  "reproduce": {
+    "command": "uv run pytest tests/unit/test_counselor_competency_seed.py tests/unit/test_counselor_competency_service.py tests/unit/test_counselor_competency_properties.py tests/integration/test_counselor_competency_api.py --cov=app/counselor_competency --cov-report=xml --cov-report=json --cov-report=term-missing",
+    "from": "backend/"
+  },
+  "evidence_files": {
+    "coverage.xml": "24a422334948d0a31caf2bed167aca99aabf71db3bf2056a727038c122a5b573",
+    "coverage.json": "7d6fdbe0cf374affce7f64f708a942e008385ec818c108aece7aa7137956523a",
+    "mypy-module.txt": "050c52a2b0c61e8b681ef5c485e0bc03340b8d55148e0acef27d744c8be42033",
+    "mypy-app.txt": "617cf8721073cc56bb19755ea6d9726d11b044fd5fe38060da7b2fe164d29396"
+  },
+  "verdict": "PASS",
+  "out_of_scope": [
+    "no .github/workflows/ci.yml wiring (separate approval)",
+    "no destructive change; nothing committed without explicit instruction"
+  ]
+}

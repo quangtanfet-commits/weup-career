@@ -27,10 +27,12 @@ routes (POST /content, POST /content/{id}/versions, GET /content/{id}) stay
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Path, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
     CurrentUser,
     career_service,
+    get_session,
     optional_current_user,
     require_content_editor,
 )
@@ -39,6 +41,7 @@ from app.careers.schemas import (
     CareerSummaryOut,
     ContentItemOut,
     CreateContentRequest,
+    LmiStatus,
 )
 from app.careers.service import CareerService
 from app.core.enums import (
@@ -49,8 +52,15 @@ from app.core.enums import (
     SchoolLevel,
     TrainingLevel,
 )
+from app.labor_market.repository import SqlLaborMarketRepo
+from app.labor_market.service import LaborMarketService
 
 router = APIRouter(tags=["careers"])
+
+
+def _lmi_service(session: AsyncSession = Depends(get_session)) -> LaborMarketService:
+    """Build a LaborMarketService for the FR-35 LMI-status enrichment."""
+    return LaborMarketService(repo=SqlLaborMarketRepo(session))
 
 
 @router.get("/careers", response_model=list[CareerSummaryOut])
@@ -61,16 +71,44 @@ async def list_careers(
     pathway_type: PathwayType | None = Query(
         None, description="Lọc theo nhánh phân luồng (gồm GDNN/trường trung học nghề)"
     ),
+    sort_by_demand: bool = Query(
+        False,
+        description=(
+            "FR-35: khi true, sắp xếp nghề có dữ liệu TTLĐ mới lên đầu. "
+            "Nghề không có snapshot (hoặc quá hạn) xuống cuối."
+        ),
+    ),
     _current: CurrentUser | None = Depends(optional_current_user),
     service: CareerService = Depends(career_service),
+    lmi: LaborMarketService = Depends(_lmi_service),
 ) -> list[CareerSummaryOut]:
+    """Career library, optionally filtered and sorted by labor demand (FR-32, FR-35).
+
+    When ``sort_by_demand=true``, each career gains an ``lmi_status`` field and
+    careers with "available" LMI data appear first. Careers without data or with
+    stale snapshots follow, clearly signalling "chưa có dữ liệu TTLĐ" (FR-35).
+    """
     careers = await service.list_careers(
         riasec=riasec,
         field=field,
         training_level=training_level,
         pathway_type=pathway_type,
     )
-    return [CareerSummaryOut.from_model(c) for c in careers]
+    # Resolve LMI status for each career's sector (FR-35).
+    # Only resolve if the caller asked for demand-sort (avoids N+1 for the common path).
+    summaries: list[CareerSummaryOut]
+    if sort_by_demand:
+        items: list[tuple[LmiStatus, CareerSummaryOut]] = []
+        for c in careers:
+            lmi_status: LmiStatus = await lmi.lmi_status_for_sector(c.field)
+            items.append((lmi_status, CareerSummaryOut.from_model(c, lmi_status=lmi_status)))
+        # Sort: "available" first, then "stale", then "no_data".
+        _order = {"available": 0, "stale": 1, "no_data": 2}
+        items.sort(key=lambda x: _order[x[0]])
+        summaries = [s for _, s in items]
+    else:
+        summaries = [CareerSummaryOut.from_model(c) for c in careers]
+    return summaries
 
 
 @router.get("/careers/{career_id}", response_model=CareerDetailOut)
@@ -78,9 +116,20 @@ async def get_career(
     career_id: str = Path(...),
     _current: CurrentUser | None = Depends(optional_current_user),
     service: CareerService = Depends(career_service),
+    lmi: LaborMarketService = Depends(_lmi_service),
 ) -> CareerDetailOut:
+    """Career detail; includes ``lmi_status`` for the career's sector (FR-35).
+
+    ``lmi_status`` is always present:
+    - ``"available"`` — fresh structured LMI snapshot exists for this sector.
+    - ``"stale"`` — snapshot exists but is beyond the 365-day threshold.
+    - ``"no_data"`` — no snapshot at all (expected MVP state for most careers).
+
+    The UI must display "chưa có dữ liệu TTLĐ" for ``stale`` or ``no_data``.
+    """
     career = await service.get_career(career_id)
-    return CareerDetailOut.from_model(career)
+    lmi_status: LmiStatus = await lmi.lmi_status_for_sector(career.field)
+    return CareerDetailOut.from_model(career, lmi_status=lmi_status)
 
 
 @router.get("/content", response_model=list[ContentItemOut])

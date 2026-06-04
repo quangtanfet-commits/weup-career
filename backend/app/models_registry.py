@@ -26,6 +26,7 @@ from app.competency.models import (
 )
 from app.core.audit_models import AuditLog
 from app.core.database import Base
+from app.counselor_competency.models import CounselorCompetency, CounselorSelfAssessment
 from app.guardians.models import GuardianConsent, GuardianLink
 from app.reco.models import Recommendation
 from app.school.models import (
@@ -47,6 +48,8 @@ __all__ = [
     "Competency",
     "ContentItem",
     "CounselingSession",
+    "CounselorCompetency",
+    "CounselorSelfAssessment",
     "GuardianConsent",
     "GuardianLink",
     "Indicator",

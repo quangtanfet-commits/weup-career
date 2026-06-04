@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncGenerator
 from datetime import date
 from typing import cast
@@ -17,8 +18,24 @@ from app.core.mailer import CapturingMailer
 from app.main import create_app
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
+from hypothesis import HealthCheck
+from hypothesis import settings as hypothesis_settings
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from starlette.applications import Starlette
+
+# Hypothesis profiles. The `ci` profile runs deeper fuzz (max_examples=500) for
+# the FR-103 property tests; activated by HYPOTHESIS_PROFILE=ci in the CI job env
+# (docs/assurance/counselor-competency-fr103.md, Gate 4). Local runs default to
+# `dev` (~50 examples) for speed. function_scoped_fixture is suppressed because
+# the DB-backed version property builds a fresh engine per example by design.
+hypothesis_settings.register_profile("dev", max_examples=50, deadline=None)
+hypothesis_settings.register_profile(
+    "ci",
+    max_examples=500,
+    deadline=None,
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
+hypothesis_settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "dev"))
 
 
 def make_settings(**overrides: object) -> Settings:

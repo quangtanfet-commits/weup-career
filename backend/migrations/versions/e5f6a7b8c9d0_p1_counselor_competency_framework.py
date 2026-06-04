@@ -1,7 +1,7 @@
 """p1 counselor competency framework
 
 Revision ID: e5f6a7b8c9d0
-Revises: d3e4f5a6b7c8
+Revises: e4f5a6b7c8d9
 Create Date: 2026-06-04 00:00:00.000000
 
 Two new tables for the P1 counselor-competency slice (FR-100..103, ADR-016):
@@ -13,9 +13,9 @@ Two new tables for the P1 counselor-competency slice (FR-100..103, ADR-016):
 - ``counselor_self_assessment``: versioned self-assessments by a counselor.
   ``scores`` is a semicolon-encoded CODE:rating string (SQLite portability).
 
-Branches off ``d3e4f5a6b7c8`` (n03 email-verification). A parallel stream
-adds another migration off the same head. Two-head state is EXPECTED here and
-is resolved by the lead at integration (see slice design note
+Chains after ``e4f5a6b7c8d9`` (P2 labor-market). This module was built in
+parallel off ``d3e4f5a6b7c8``; the two-head state was resolved at integration
+by rebasing this migration onto the P2 head (see slice design note
 docs/slices/p1-counselor-competency.md).
 """
 
@@ -27,7 +27,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "e5f6a7b8c9d0"
-down_revision: str | None = "d3e4f5a6b7c8"
+down_revision: str | None = "e4f5a6b7c8d9"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

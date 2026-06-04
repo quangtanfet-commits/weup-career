@@ -1,7 +1,7 @@
 """Labor Market Intelligence ORM model (spec.md §5, FR-34/FR-35; ADR-015).
 
 ``LaborMarketSnapshot`` is the structured representation of labor market data for
-a given sector × region combination. It is the first-class entity that replaces
+a given sector x region combination. It is the first-class entity that replaces
 the free-text ``CareerProfile.labor_market_outlook`` for quantitative signals.
 
 **Provenance guard (ADR-015 §Decision 2):**
@@ -31,11 +31,11 @@ from sqlalchemy import Date, DateTime, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.core.models import UUIDMixin, new_uuid, utcnow
+from app.core.models import UUIDMixin, utcnow
 
 
 class LaborMarketSnapshot(UUIDMixin, Base):
-    """A structured LMI snapshot for one sector × region pair.
+    """A structured LMI snapshot for one sector x region pair.
 
     ``source_ref`` and ``as_of_date`` are NOT NULL — provenance is mandatory.
     """
@@ -49,7 +49,7 @@ class LaborMarketSnapshot(UUIDMixin, Base):
 
     # Occupational sector (e.g. "technology", "health"). Join key to CareerProfile.field.
     sector: Mapped[str] = mapped_column(String(128), nullable=False)
-    # Human-readable salary band (e.g. "15–30 triệu VNĐ/tháng").
+    # Human-readable salary band (e.g. "15-30 triệu VNĐ/tháng").
     salary_range: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     # Demand direction label (e.g. "tăng mạnh", "ổn định").
     demand_forecast: Mapped[str] = mapped_column(String(255), nullable=False, default="")

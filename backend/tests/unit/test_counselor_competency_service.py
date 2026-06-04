@@ -9,7 +9,6 @@ Covers edge paths not exercised by the integration tests:
 from __future__ import annotations
 
 import pytest
-
 from app.counselor_competency.service import _decode_scores, _encode_scores
 
 # -- _decode_scores edge cases -----------------------------------------------
@@ -62,7 +61,7 @@ async def test_suggest_all_high_scores_returns_positive_message() -> None:
     """All high scores → positive maintenance message, no gaps."""
     from unittest.mock import AsyncMock
 
-    from app.counselor_competency.service import CounselorCompetencyService, _SUGGESTION_ALL_GOOD
+    from app.counselor_competency.service import _SUGGESTION_ALL_GOOD, CounselorCompetencyService
 
     repo = AsyncMock()
     svc = CounselorCompetencyService.__new__(CounselorCompetencyService)

@@ -8,14 +8,13 @@ tests exercise via the router.
 
 from __future__ import annotations
 
-import pytest
 from datetime import date, timedelta
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
+import pytest
+from app.core.exceptions import ValidationError
 from app.labor_market.repository import SqlLaborMarketRepo
 from app.labor_market.service import LaborMarketService, SnapshotDraft
-from app.core.exceptions import ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.asyncio
 
@@ -34,7 +33,6 @@ async def _make_service(session: AsyncSession) -> LaborMarketService:
 async def test_seed_creates_zero_rows(db: object) -> None:
     """The seed function must insert zero rows (no fabricated data)."""
     from app.labor_market.seed import seed_labor_market
-    from app.core.database import Database
 
     db_ = db  # type: ignore[assignment]
     async with db_.session_factory() as s:  # type: ignore[attr-defined]
@@ -55,8 +53,8 @@ async def test_repo_list_empty(session: AsyncSession) -> None:
 
 async def test_repo_list_returns_fresh(session: AsyncSession) -> None:
     """list_snapshots returns fresh snapshot rows."""
-    from app.labor_market.models import LaborMarketSnapshot
     from app.core.models import new_uuid
+    from app.labor_market.models import LaborMarketSnapshot
 
     snap = LaborMarketSnapshot(
         id=new_uuid(),
@@ -80,8 +78,8 @@ async def test_repo_list_returns_fresh(session: AsyncSession) -> None:
 
 async def test_repo_list_excludes_stale(session: AsyncSession) -> None:
     """list_snapshots excludes rows whose as_of_date is beyond the staleness threshold."""
-    from app.labor_market.models import LaborMarketSnapshot
     from app.core.models import new_uuid
+    from app.labor_market.models import LaborMarketSnapshot
 
     stale = LaborMarketSnapshot(
         id=new_uuid(),
@@ -104,8 +102,8 @@ async def test_repo_list_excludes_stale(session: AsyncSession) -> None:
 
 async def test_repo_filter_by_sector(session: AsyncSession) -> None:
     """list_snapshots(sector=...) filters by sector."""
-    from app.labor_market.models import LaborMarketSnapshot
     from app.core.models import new_uuid
+    from app.labor_market.models import LaborMarketSnapshot
 
     for s_name in ("technology", "health"):
         session.add(
@@ -131,8 +129,8 @@ async def test_repo_filter_by_sector(session: AsyncSession) -> None:
 
 async def test_repo_filter_by_region(session: AsyncSession) -> None:
     """list_snapshots(region=...) filters by region."""
-    from app.labor_market.models import LaborMarketSnapshot
     from app.core.models import new_uuid
+    from app.labor_market.models import LaborMarketSnapshot
 
     for region in ("Hà Nội", "Hồ Chí Minh"):
         session.add(
@@ -221,8 +219,8 @@ async def test_lmi_status_no_data_when_empty(session: AsyncSession) -> None:
 
 async def test_lmi_status_available_when_fresh(session: AsyncSession) -> None:
     """lmi_status_for_sector returns 'available' when a fresh snapshot exists."""
-    from app.labor_market.models import LaborMarketSnapshot
     from app.core.models import new_uuid
+    from app.labor_market.models import LaborMarketSnapshot
 
     session.add(
         LaborMarketSnapshot(
@@ -245,8 +243,8 @@ async def test_lmi_status_available_when_fresh(session: AsyncSession) -> None:
 
 async def test_lmi_status_stale_when_old(session: AsyncSession) -> None:
     """lmi_status_for_sector returns 'stale' when only old snapshots exist."""
-    from app.labor_market.models import LaborMarketSnapshot
     from app.core.models import new_uuid
+    from app.labor_market.models import LaborMarketSnapshot
 
     session.add(
         LaborMarketSnapshot(

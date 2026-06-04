@@ -17,12 +17,12 @@ repository; the endpoint does not return stale data.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, get_current_user, get_session
 from app.labor_market.repository import SqlLaborMarketRepo
 from app.labor_market.schemas import LaborMarketSnapshotOut
 from app.labor_market.service import LaborMarketService
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["labor-market"])
 

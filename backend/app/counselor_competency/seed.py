@@ -104,9 +104,7 @@ async def seed_counselor_competencies(session: AsyncSession) -> dict[str, str]:
         existing = (
             (
                 await session.execute(
-                    select(CounselorCompetency).where(
-                        CounselorCompetency.code == entry["code"]
-                    )
+                    select(CounselorCompetency).where(CounselorCompetency.code == entry["code"])
                 )
             )
             .scalars()

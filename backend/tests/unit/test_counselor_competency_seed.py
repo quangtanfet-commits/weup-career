@@ -7,11 +7,10 @@ re-running the seeder must take the ``existing is not None`` branch
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.counselor_competency.models import CounselorCompetency
 from app.counselor_competency.seed import FRAMEWORK, seed_counselor_competencies
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def test_seed_is_idempotent(session: AsyncSession) -> None:

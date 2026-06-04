@@ -25,7 +25,7 @@ class CounselorCompetencyOut(BaseModel):
     source_ref: str
 
     @classmethod
-    def from_model(cls, m: CounselorCompetency) -> "CounselorCompetencyOut":
+    def from_model(cls, m: CounselorCompetency) -> CounselorCompetencyOut:
         return cls(
             id=m.id,
             code=m.code,
@@ -37,11 +37,11 @@ class CounselorCompetencyOut(BaseModel):
 
 
 class CreateSelfAssessmentRequest(BaseModel):
-    """Submit a self-assessment: per-competency scores (1–5 each)."""
+    """Submit a self-assessment: per-competency scores (1-5 each)."""
 
     scores: dict[str, int] = Field(
         min_length=1,
-        description="Mapping of competency code → self-rating (1–5).",
+        description="Mapping of competency code → self-rating (1-5).",
     )
 
 
@@ -56,7 +56,7 @@ class SelfAssessmentOut(BaseModel):
     created_at: datetime
 
     @classmethod
-    def from_result(cls, r: SelfAssessmentResult) -> "SelfAssessmentOut":
+    def from_result(cls, r: SelfAssessmentResult) -> SelfAssessmentOut:
         return cls(
             id=r.id,
             counselor_id=r.counselor_id,

@@ -65,9 +65,7 @@ class SqlCounselorCompetencyRepo:
         await self._session.flush()
         return assessment
 
-    async def list_self_assessments(
-        self, *, counselor_id: str
-    ) -> list[CounselorSelfAssessment]:
+    async def list_self_assessments(self, *, counselor_id: str) -> list[CounselorSelfAssessment]:
         """All self-assessments for one counselor, latest version first."""
         result = await self._session.execute(
             select(CounselorSelfAssessment)

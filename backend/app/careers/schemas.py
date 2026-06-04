@@ -62,9 +62,7 @@ class CareerSummaryOut(BaseModel):
     lmi_status: LmiStatus = "no_data"
 
     @classmethod
-    def from_model(
-        cls, c: CareerProfile, lmi_status: LmiStatus = "no_data"
-    ) -> CareerSummaryOut:
+    def from_model(cls, c: CareerProfile, lmi_status: LmiStatus = "no_data") -> CareerSummaryOut:
         return cls(
             id=c.id,
             name=c.name,

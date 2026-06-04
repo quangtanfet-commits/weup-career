@@ -21,7 +21,7 @@ Privacy / CP-1 isolation (FR-103, ADR-016):
 
 Development-path suggestion (FR-102):
   - Runs in its own flow, not through CP-5/CP-6.
-  - Identifies competencies rated ≤ DEV_PATH_LOW_THRESHOLD (default 2 on 1–5
+  - Identifies competencies rated ≤ DEV_PATH_LOW_THRESHOLD (default 2 on 1-5
     scale) as improvement targets.
   - Produces a Vietnamese-language text explaining which competencies need work
     and points to TT 18/2025 training modules as a concrete step.
@@ -33,18 +33,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.counselor_competency.models import CounselorCompetency, CounselorSelfAssessment
-from app.counselor_competency.repository import ICounselorCompetencyRepo
 from app.core.exceptions import PermissionDeniedError
 from app.core.models import new_uuid
+from app.counselor_competency.models import CounselorCompetency, CounselorSelfAssessment
+from app.counselor_competency.repository import ICounselorCompetencyRepo
 from app.school.repository import ISchoolRepo
 
 # Competencies rated at or below this threshold are flagged as development targets.
 DEV_PATH_LOW_THRESHOLD = 2
 
-_SUGGESTION_HEADER = (
-    "Kết quả tự đánh giá cho thấy bạn cần tập trung phát triển các năng lực sau:\n"
-)
+_SUGGESTION_HEADER = "Kết quả tự đánh giá cho thấy bạn cần tập trung phát triển các năng lực sau:\n"
 _SUGGESTION_ITEM = (
     "  - {name_vi} ({code}): điểm hiện tại {score}/5 — "
     "khuyến nghị tham gia tập huấn theo {source_ref}.\n"
@@ -113,18 +111,21 @@ class CounselorCompetencyService:
         Authority is re-derived from ``SchoolMembership`` per request (never
         from the JWT claim) — mirrors the CP-4 pattern.
         """
-        from app.core.enums import SchoolRole
         from sqlalchemy import select
+
+        from app.core.enums import SchoolRole
         from app.school.models import SchoolMembership
 
         # Reach into the school repo's session via the internal attribute.
         # This avoids importing FastAPI and stays within the hexagonal boundary.
         session = self._school._session  # type: ignore[attr-defined]
         result = await session.execute(
-            select(SchoolMembership.id).where(
+            select(SchoolMembership.id)
+            .where(
                 SchoolMembership.user_id == user_id,
                 SchoolMembership.role == SchoolRole.COUNSELOR,
-            ).limit(1)
+            )
+            .limit(1)
         )
         if result.first() is None:
             raise PermissionDeniedError(
@@ -133,9 +134,7 @@ class CounselorCompetencyService:
 
     # -- framework (FR-100) --------------------------------------------------
 
-    async def list_competencies(
-        self, *, actor_id: str
-    ) -> list[CounselorCompetency]:
+    async def list_competencies(self, *, actor_id: str) -> list[CounselorCompetency]:
         """Return the full counseling-practice competency framework.
 
         Counselor membership required; anyone else → PermissionDeniedError.
@@ -183,9 +182,7 @@ class CounselorCompetencyService:
             created_at=row.created_at,
         )
 
-    async def list_self_assessments(
-        self, *, counselor_id: str
-    ) -> list[SelfAssessmentResult]:
+    async def list_self_assessments(self, *, counselor_id: str) -> list[SelfAssessmentResult]:
         """The calling counselor's own assessment history, latest first."""
         await self._require_counselor(user_id=counselor_id)
         rows = await self._repo.list_self_assessments(counselor_id=counselor_id)

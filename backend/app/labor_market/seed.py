@@ -19,7 +19,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def seed_labor_market(session: AsyncSession) -> int:  # noqa: ARG001
+async def seed_labor_market(session: AsyncSession) -> int:
     """Seed function — inserts zero rows by design (ADR-015).
 
     Returns 0 to signal the empty framework is in place. The ``session``

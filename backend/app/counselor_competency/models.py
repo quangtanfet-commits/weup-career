@@ -72,9 +72,7 @@ class CounselorSelfAssessment(UUIDMixin, Base):
     __table_args__ = (
         Index("ix_counselor_self_assessment_counselor", "counselor_id"),
         # (counselor_id, version) together is unique — no duplicate versions per counselor.
-        UniqueConstraint(
-            "counselor_id", "version", name="uq_counselor_self_assessment_version"
-        ),
+        UniqueConstraint("counselor_id", "version", name="uq_counselor_self_assessment_version"),
     )
 
     counselor_id: Mapped[str] = mapped_column(

@@ -16,8 +16,9 @@ These are real DB tests (no mocks) — coverage counts.
 
 from __future__ import annotations
 
-import pytest
 from datetime import date, timedelta
+
+import pytest
 from app.core.database import Database
 from httpx import AsyncClient
 
@@ -30,7 +31,7 @@ pytestmark = pytest.mark.asyncio
 
 
 async def _adult_token(client: AsyncClient, email: str = "lmi_adult@example.com") -> str:
-    resp = await register_and_verify(client, mailer_of(client), email=email, dob="1990-01-01")
+    await register_and_verify(client, mailer_of(client), email=email, dob="1990-01-01")
     login = await client.post(
         "/api/v1/auth/login", json={"email": email, "password": "Password123"}
     )
@@ -54,8 +55,8 @@ async def _create_snapshot(
     version: int = 1,
 ) -> str:
     """Insert a LaborMarketSnapshot directly into the DB; return its id."""
-    from app.labor_market.models import LaborMarketSnapshot
     from app.core.models import new_uuid
+    from app.labor_market.models import LaborMarketSnapshot
 
     snap_id = new_uuid()
     effective_date = as_of_date if as_of_date is not None else date.today()
@@ -80,9 +81,7 @@ async def _create_snapshot(
 # -- GET /api/v1/labor-market/snapshots ------------------------------------
 
 
-async def test_list_snapshots_empty_when_no_data(
-    client: AsyncClient, db: Database
-) -> None:
+async def test_list_snapshots_empty_when_no_data(client: AsyncClient, db: Database) -> None:
     """Empty list returned cleanly when no snapshot exists (FR-34 — no error)."""
     token = await _adult_token(client)
     resp = await client.get("/api/v1/labor-market/snapshots", headers=_auth(token))
@@ -90,9 +89,7 @@ async def test_list_snapshots_empty_when_no_data(
     assert resp.json() == []
 
 
-async def test_list_snapshots_returns_fresh_snapshot(
-    client: AsyncClient, db: Database
-) -> None:
+async def test_list_snapshots_returns_fresh_snapshot(client: AsyncClient, db: Database) -> None:
     """A freshly-dated snapshot is returned in the list."""
     token = await _adult_token(client, "lmi_fresh@example.com")
     await _create_snapshot(db, sector="health", region="Hà Nội")
@@ -108,9 +105,7 @@ async def test_list_snapshots_returns_fresh_snapshot(
     assert "required_skills" in snap
 
 
-async def test_list_snapshots_filter_by_sector(
-    client: AsyncClient, db: Database
-) -> None:
+async def test_list_snapshots_filter_by_sector(client: AsyncClient, db: Database) -> None:
     """Only snapshots matching the requested sector are returned."""
     token = await _adult_token(client, "lmi_sec@example.com")
     await _create_snapshot(db, sector="technology", region="toàn quốc")
@@ -126,9 +121,7 @@ async def test_list_snapshots_filter_by_sector(
     assert body[0]["sector"] == "technology"
 
 
-async def test_list_snapshots_filter_by_region(
-    client: AsyncClient, db: Database
-) -> None:
+async def test_list_snapshots_filter_by_region(client: AsyncClient, db: Database) -> None:
     """Only snapshots matching the requested region are returned."""
     token = await _adult_token(client, "lmi_reg@example.com")
     await _create_snapshot(db, sector="technology", region="Hà Nội")
@@ -144,9 +137,7 @@ async def test_list_snapshots_filter_by_region(
     assert body[0]["region"] == "Hà Nội"
 
 
-async def test_list_snapshots_excludes_stale(
-    client: AsyncClient, db: Database
-) -> None:
+async def test_list_snapshots_excludes_stale(client: AsyncClient, db: Database) -> None:
     """Snapshots older than 365 days are excluded (NFR-26 / ADR-015 cadence)."""
     token = await _adult_token(client, "lmi_stale@example.com")
     stale_date = date.today() - timedelta(days=366)
@@ -169,12 +160,10 @@ async def test_list_snapshots_requires_auth(client: AsyncClient, db: Database) -
 # -- Provenance rejection ---------------------------------------------------
 
 
-async def test_provenance_rejection_missing_source_ref(
-    client: AsyncClient, db: Database
-) -> None:
+async def test_provenance_rejection_missing_source_ref(client: AsyncClient, db: Database) -> None:
     """A snapshot insert without source_ref is rejected at the DB/schema level."""
-    from app.labor_market.models import LaborMarketSnapshot
     from app.core.models import new_uuid
+    from app.labor_market.models import LaborMarketSnapshot
     from sqlalchemy.exc import IntegrityError
 
     async with db.session_factory() as s:
@@ -195,12 +184,10 @@ async def test_provenance_rejection_missing_source_ref(
             await s.commit()
 
 
-async def test_provenance_rejection_missing_as_of_date(
-    client: AsyncClient, db: Database
-) -> None:
+async def test_provenance_rejection_missing_as_of_date(client: AsyncClient, db: Database) -> None:
     """A snapshot insert without as_of_date is rejected at the DB/schema level."""
-    from app.labor_market.models import LaborMarketSnapshot
     from app.core.models import new_uuid
+    from app.labor_market.models import LaborMarketSnapshot
     from sqlalchemy.exc import IntegrityError
 
     async with db.session_factory() as s:

@@ -19,16 +19,15 @@ from __future__ import annotations
 
 import asyncio
 
-from hypothesis import given, settings
-from hypothesis import strategies as st
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
-
 from app.core.database import Base
 from app.core.models import new_uuid, utcnow
 from app.counselor_competency.models import CounselorSelfAssessment
 from app.counselor_competency.repository import SqlCounselorCompetencyRepo
 from app.counselor_competency.service import _decode_scores, _encode_scores
+from hypothesis import given, settings
+from hypothesis import strategies as st
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 # The real framework uses the ``CC-NN`` shape — delimiter- and whitespace-free,
 # so it round-trips losslessly. Round-trip properties use this domain.

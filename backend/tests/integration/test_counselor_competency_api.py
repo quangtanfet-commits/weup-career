@@ -15,8 +15,8 @@ Coverage targets:
 from __future__ import annotations
 
 import pytest
-from httpx import AsyncClient
 from app.core.database import Database
+from httpx import AsyncClient
 
 from tests.conftest import enroll_membership, mailer_of, register_and_verify
 
@@ -31,9 +31,7 @@ async def _register(client: AsyncClient, **kw: str) -> dict[str, str]:
 
 
 async def _token(client: AsyncClient, email: str, password: str = "Password123") -> str:
-    login = await client.post(
-        "/api/v1/auth/login", json={"email": email, "password": password}
-    )
+    login = await client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert login.status_code == 200, login.text
     return login.json()["access_token"]
 
@@ -98,9 +96,7 @@ async def test_non_counselor_cannot_see_framework(
     assert resp.status_code == 403, resp.text
 
 
-async def test_unauthenticated_cannot_see_framework(
-    client: AsyncClient, db: Database
-) -> None:
+async def test_unauthenticated_cannot_see_framework(client: AsyncClient, db: Database) -> None:
     """No token → 401."""
     resp = await client.get("/api/v1/counselor/competencies")
     assert resp.status_code == 401, resp.text
@@ -265,24 +261,16 @@ async def test_cp1_separation_counselor_no_guardian_needed(
 
     # Verify no student career data was touched (conceptual: no AssessmentResult
     # or Recommendation rows were created for this counselor's user_id).
-    from sqlalchemy import select
     from app.assessments.models import AssessmentResult
     from app.reco.models import Recommendation
+    from sqlalchemy import select
 
     async with db.session_factory() as s:
         ar = (
-            await s.execute(
-                select(AssessmentResult).where(
-                    AssessmentResult.user_id == user["id"]
-                )
-            )
+            await s.execute(select(AssessmentResult).where(AssessmentResult.user_id == user["id"]))
         ).first()
         rec = (
-            await s.execute(
-                select(Recommendation).where(
-                    Recommendation.user_id == user["id"]
-                )
-            )
+            await s.execute(select(Recommendation).where(Recommendation.user_id == user["id"]))
         ).first()
     assert ar is None, "Counselor self-assessment must NOT create student AssessmentResult rows"
     assert rec is None, "Counselor self-assessment must NOT create Recommendation rows"
@@ -302,10 +290,10 @@ async def test_cp4_new_endpoints_do_not_widen_authority(
     is present in this module.
     """
     await _seed_framework(client, db)
-    counselor1_user, tok1 = await _counselor_with_school(
+    _counselor1_user, tok1 = await _counselor_with_school(
         client, db, seeded_school["school"], email="c6a@weup-test.com"
     )
-    counselor2_user, tok2 = await _counselor_with_school(
+    _counselor2_user, tok2 = await _counselor_with_school(
         client, db, seeded_school["school"], email="c6b@weup-test.com"
     )
 
@@ -320,9 +308,7 @@ async def test_cp4_new_endpoints_do_not_widen_authority(
     # counselor2 sees only their own (empty) list — not counselor1's
     resp = await client.get("/api/v1/me/counselor/self-assessments", headers=_auth(tok2))
     assert resp.status_code == 200, resp.text
-    assert resp.json() == [], (
-        "CP-4 violated: counselor2 must not see counselor1's self-assessments"
-    )
+    assert resp.json() == [], "CP-4 violated: counselor2 must not see counselor1's self-assessments"
 
     # The school-reachability (has_counselor_access) is not touched by this module.
     # Verify the existing counselor-student reachability still works via the school

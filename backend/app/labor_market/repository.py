@@ -45,8 +45,7 @@ class ILaborMarketRepo(Protocol):
         """Return the most-recent fresh snapshot for the sector, or None."""
         ...
 
-    async def add_snapshot(self, snap: LaborMarketSnapshot) -> LaborMarketSnapshot:
-        ...
+    async def add_snapshot(self, snap: LaborMarketSnapshot) -> LaborMarketSnapshot: ...
 
 
 class SqlLaborMarketRepo:

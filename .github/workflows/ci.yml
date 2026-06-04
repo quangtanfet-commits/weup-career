@@ -177,6 +177,8 @@ jobs:
           SECRET_KEY: ci-test-secret-key-not-for-production-use
           ENVIRONMENT: test
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          # FR-103 property fuzz runs deeper in CI (docs/assurance/counselor-competency-fr103.md, Gate 4).
+          HYPOTHESIS_PROFILE: ci
         run: |
           pytest tests/ \
             --cov=app \
@@ -194,6 +196,23 @@ jobs:
           coverage report \
             --include="app/auth/*,app/guardians/*,app/assessments/*,app/reco/*,app/core/consent.py,app/core/crypto.py,app/core/security.py,app/core/audit.py,app/core/authz.py,app/core/ratelimit.py" \
             --fail-under=100
+
+      - name: FR-103 assurance coverage (counselor_competency — line>=95 / branch>=90)
+        # Tái dùng .coverage từ bước test — KHÔNG chạy lại.
+        # Personal-data class (docs/assurance/counselor-competency-fr103.md, Gate 4).
+        # Hiện tại module ở 100/100; ngưỡng giữ ở 95/90 theo lớp assurance.
+        # function=100 ghi trong evidence bundle, không gate (coverage.py không có metric hàm).
+        run: |
+          coverage json --include="app/counselor_competency/*" -o cc-coverage.json -q
+          python - <<'PY'
+          import json, sys
+          t = json.load(open("cc-coverage.json"))["totals"]
+          line = t["percent_covered"]
+          br = 100.0 * t["covered_branches"] / t["num_branches"] if t["num_branches"] else 100.0
+          print(f"counselor_competency line={line:.2f}% branch={br:.2f}% "
+                f"(stmts={t['num_statements']} branches={t['num_branches']})")
+          sys.exit(0 if line >= 95 and br >= 90 else 1)
+          PY
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1

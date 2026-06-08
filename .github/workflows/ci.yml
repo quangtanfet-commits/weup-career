@@ -287,7 +287,7 @@ jobs:
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
         if: ${{ env.CHROMATIC_PROJECT_TOKEN != '' }}
-        uses: chromaui/action@d92ea1ce501f70e8c34745b2c7888648150a368a # v17.2.0
+        uses: chromaui/action@05812acac141ce7d317a3f787be88122bca27cf4 # v17.3.0
         with:
           workingDir: frontend
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}

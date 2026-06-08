@@ -85,7 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -156,7 +156,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -301,7 +301,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -422,7 +422,7 @@ jobs:
             backend/app/assessments/**
             backend/tests/bias/**
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         if: steps.bias-changed.outputs.any_changed == 'true'
         with:
           python-version: ${{ env.PYTHON_VERSION }}
